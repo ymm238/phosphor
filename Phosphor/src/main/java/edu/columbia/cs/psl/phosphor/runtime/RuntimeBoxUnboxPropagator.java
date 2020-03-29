@@ -2,6 +2,7 @@ package edu.columbia.cs.psl.phosphor.runtime;
 
 import edu.columbia.cs.psl.phosphor.Configuration;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREMethodHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
 
 public class RuntimeBoxUnboxPropagator {
@@ -33,7 +34,7 @@ public class RuntimeBoxUnboxPropagator {
     }
 
     public static void getChars$$PHOSPHORTAGGED(long l, Taint lt, int idx, Taint idt, LazyCharArrayObjTags ta, Taint taTaint) {
-        Long.getChars(l, idx, ta.val);
+        InstrumentedJREMethodHelper.java_lang_Long_getChars(l, idx, ta.val);
         if(lt != null) {
             int nChars;
             if(l < 0) {
@@ -51,7 +52,8 @@ public class RuntimeBoxUnboxPropagator {
     }
 
     public static void getChars$$PHOSPHORTAGGED(int i, Taint it, int idx, Taint idt, LazyCharArrayObjTags ta, Taint taTaint) {
-        Integer.getChars(i, idx, ta.val);
+        InstrumentedJREMethodHelper.java_lang_Integer_getChars(i, idx, ta.val);
+
         if(it != null) {
             int nChars;
             if(i < 0) {
@@ -76,6 +78,57 @@ public class RuntimeBoxUnboxPropagator {
         getChars$$PHOSPHORTAGGED(i, it, idx, idt, ta, taTaint);
     }
 
+    public static TaintedIntWithObjTag getChars$$PHOSPHORTAGGED(long l, Taint lt, int idx, Taint idt, LazyByteArrayObjTags ta, Taint taTaint, TaintedIntWithObjTag ret) {
+        ret.val = InstrumentedJREMethodHelper.java_lang_Long_getChars(l, idx, ta.val);
+        ret.taint = Taint.emptyTaint();
+        if(lt != null) {
+            int nChars;
+            if(l < 0) {
+                nChars = stringSize(-l) + 1;
+            } else {
+                nChars = stringSize(l);
+            }
+            if(ta.taints == null) {
+                ta.taints = new Taint[ta.val.length];
+            }
+            for(int k = idx - nChars; k < idx; k++) {
+                ta.taints[k] = lt;
+            }
+        }
+        return ret;
+    }
+
+    public static TaintedIntWithObjTag getChars$$PHOSPHORTAGGED(int i, Taint it, int idx, Taint idt, LazyByteArrayObjTags ta, Taint taTaint, TaintedIntWithObjTag ret) {
+        ret.val = InstrumentedJREMethodHelper.java_lang_Integer_getChars(i, idx, ta.val);
+        ret.taint = Taint.emptyTaint();
+
+        if(it != null) {
+            int nChars;
+            if(i < 0) {
+                nChars = stringSize(-i) + 1;
+            } else {
+                nChars = stringSize(i);
+            }
+            if(ta.taints == null) {
+                ta.taints = new Taint[ta.val.length];
+            }
+            for(int k = idx - nChars; k < Math.min(idx, ta.taints.length); k++) {
+                ta.taints[k] = it;
+            }
+        }
+        return ret;
+    }
+
+    public static TaintedIntWithObjTag getChars$$PHOSPHORTAGGED(long l, Taint lt, int idx, Taint idt, LazyByteArrayObjTags ta, Taint taTaint, TaintedIntWithObjTag ret, ControlFlowStack ctrl) {
+        getChars$$PHOSPHORTAGGED(l, lt, idx, idt, ta, taTaint, ret);
+        return ret;
+    }
+
+    public static TaintedIntWithObjTag getChars$$PHOSPHORTAGGED(int i, Taint it, int idx, Taint idt, LazyByteArrayObjTags ta, Taint taTaint, TaintedIntWithObjTag ret, ControlFlowStack ctrl) {
+        getChars$$PHOSPHORTAGGED(i, it, idx, idt, ta, taTaint, ret);
+        return ret;
+    }
+
     public static TaintedReferenceWithObjTag toString$$PHOSPHORTAGGED(byte i, Taint t, TaintedReferenceWithObjTag ret) {
         if(t == null) {
             ret.val = Byte.toString(i);
@@ -83,7 +136,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Byte.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -95,7 +148,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Character.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -107,7 +160,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -119,7 +172,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toString(i, r).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -131,7 +184,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toUnsignedString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -143,7 +196,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toUnsignedString(i, r).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -155,7 +208,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toOctalString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -167,7 +220,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toHexString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -179,7 +232,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -191,7 +244,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Boolean.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -203,7 +256,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Float.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -215,7 +268,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Float.toHexString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -227,7 +280,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Double.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -239,7 +292,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Double.toHexString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -251,7 +304,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -263,7 +316,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toString(i, r).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -275,7 +328,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toBinaryString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -287,7 +340,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toBinaryString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -303,7 +356,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toHexString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -315,7 +368,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toUnsignedString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -327,7 +380,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toUnsignedString(i, r).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -339,7 +392,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toUnsignedString(i, r).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -351,7 +404,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toOctalString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -363,7 +416,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Byte.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
 
@@ -376,7 +429,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Character.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -388,7 +441,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -400,7 +453,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toUnsignedString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -412,7 +465,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toUnsignedString(i, r).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -424,7 +477,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toOctalString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -436,7 +489,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toHexString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -448,7 +501,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Integer.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -460,7 +513,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Boolean.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -472,7 +525,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Float.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -484,15 +537,15 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Float.toHexString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
 
     public static TaintedReferenceWithObjTag toString$$PHOSPHORTAGGED(double i, Taint t, TaintedReferenceWithObjTag ret, ControlFlowStack ctrl) {
-        Double.toString$$PHOSPHORTAGGED(i, t, ret, ctrl);
-        ret.val = new String(((LazyCharArrayObjTags) ret.val), Taint.emptyTaint(), ctrl);
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        InstrumentedJREMethodHelper.java_lang_Double_toString$$PHOSPHORTAGGED(i, t, ret, ctrl);
+        ret.val = InstrumentedJREMethodHelper.java_lang_String_init(Taint.emptyTaint(), (LazyCharArrayObjTags) ret.val, Taint.emptyTaint(), ctrl);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -504,7 +557,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Double.toHexString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -516,7 +569,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -528,7 +581,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toString(i, r).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -540,7 +593,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toBinaryString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -552,7 +605,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toHexString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -564,7 +617,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toUnsignedString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -576,7 +629,7 @@ public class RuntimeBoxUnboxPropagator {
             return ret;
         }
         ret.val = new String(Long.toOctalString(i).toCharArray());
-        ((String) ret.val).setPHOSPHOR_TAG(t);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
         ret.taint = t;
         return ret;
     }
@@ -599,11 +652,11 @@ public class RuntimeBoxUnboxPropagator {
 
     public static TaintedReferenceWithObjTag valueOf(long l, Taint t, TaintedReferenceWithObjTag ret, ControlFlowStack ctrl) {
         if(t == null) {
-            Long.valueOf$$PHOSPHORTAGGED(l, t, ret, ctrl);
+            InstrumentedJREMethodHelper.java_lang_Long_valueOf$$PHOSPHORTAGGED(l, t, ret, ctrl);
             ret.taint = Taint.emptyTaint();
             return ret;
         } else {
-            ret.val = new Long(l, t, ctrl);
+            ret.val = InstrumentedJREMethodHelper.java_lang_Long_init(Taint.emptyTaint(), l, t, ctrl);
             ret.taint = t;
             ((TaintedWithObjTag) (ret.val)).setPHOSPHOR_TAG(t);
             return ret;
@@ -612,12 +665,14 @@ public class RuntimeBoxUnboxPropagator {
 
     public static TaintedReferenceWithObjTag valueOf(long l, Taint t, TaintedReferenceWithObjTag ret) {
         if(t == null) {
-            Long.valueOf$$PHOSPHORTAGGED(l, t, ret);
+            InstrumentedJREMethodHelper.java_lang_Long_valueOf$$PHOSPHORTAGGED(l, t, ret);
             ret.taint = Taint.emptyTaint();
             return ret;
 
         } else {
-            ret.val = new Long(l, t, null);
+            ret.val = InstrumentedJREMethodHelper.java_lang_Long_init(Taint.emptyTaint(), l, t);
+
+            ret.val = InstrumentedJREMethodHelper.java_lang_Long_init(Taint.emptyTaint(), l, t);
             ret.taint = t;
             ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(t);
             return ret;
@@ -1054,56 +1109,56 @@ public class RuntimeBoxUnboxPropagator {
 
     public static TaintedReferenceWithObjTag toString$$PHOSPHORTAGGED(Boolean value, Taint tag, TaintedReferenceWithObjTag ret) {
         ret.val = value.toString();
-        ((String) ret.val).setPHOSPHOR_TAG(tag);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(tag);
         ret.taint = tag;
         return ret;
     }
 
     public static TaintedReferenceWithObjTag toString$$PHOSPHORTAGGED(Byte value, Taint tag, TaintedReferenceWithObjTag ret) {
         ret.val = value.toString();
-        ((String) ret.val).setPHOSPHOR_TAG(tag);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(tag);
         ret.taint = tag;
         return ret;
     }
 
     public static TaintedReferenceWithObjTag toString$$PHOSPHORTAGGED(Character value, Taint tag, TaintedReferenceWithObjTag ret) {
         ret.val = value.toString();
-        ((String) ret.val).setPHOSPHOR_TAG(tag);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(tag);
         ret.taint = tag;
         return ret;
     }
 
     public static TaintedReferenceWithObjTag toString$$PHOSPHORTAGGED(Float value, Taint tag, TaintedReferenceWithObjTag ret) {
         ret.val = value.toString();
-        ((String) ret.val).setPHOSPHOR_TAG(tag);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(tag);
         ret.taint = tag;
         return ret;
     }
 
     public static TaintedReferenceWithObjTag toString$$PHOSPHORTAGGED(Integer value, Taint tag, TaintedReferenceWithObjTag ret) {
         ret.val = value.toString();
-        ((String) ret.val).setPHOSPHOR_TAG(tag);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(tag);
         ret.taint = tag;
         return ret;
     }
 
     public static TaintedReferenceWithObjTag toString$$PHOSPHORTAGGED(Long value, Taint tag, TaintedReferenceWithObjTag ret) {
         ret.val = value.toString();
-        ((String) ret.val).setPHOSPHOR_TAG(tag);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(tag);
         ret.taint = tag;
         return ret;
     }
 
     public static TaintedReferenceWithObjTag toString$$PHOSPHORTAGGED(Short value, Taint tag, TaintedReferenceWithObjTag ret) {
         ret.val = value.toString();
-        ((String) ret.val).setPHOSPHOR_TAG(tag);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(tag);
         ret.taint = tag;
         return ret;
     }
 
     public static TaintedReferenceWithObjTag toString$$PHOSPHORTAGGED(Double value, Taint tag, TaintedReferenceWithObjTag ret) {
         ret.val = value.toString();
-        ((String) ret.val).setPHOSPHOR_TAG(tag);
+        ((TaintedWithObjTag) ret.val).setPHOSPHOR_TAG(tag);
         ret.taint = tag;
         return ret;
     }

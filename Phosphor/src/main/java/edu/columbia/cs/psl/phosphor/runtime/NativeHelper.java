@@ -2,6 +2,7 @@ package edu.columbia.cs.psl.phosphor.runtime;
 
 import edu.columbia.cs.psl.phosphor.Configuration;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREMethodHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArray;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArrayWithObjTag;
@@ -78,6 +79,7 @@ public final class NativeHelper {
     public static Collection ensureIsBoxedImplicitTracking(Collection in) {
         if(in != null) {
             Collection tmp = null;
+            TaintedBooleanWithObjTag retTmp = new TaintedBooleanWithObjTag();
             for(Object o : in) {
                 if(o == null) {
                     break;
@@ -91,14 +93,16 @@ public final class NativeHelper {
                             ex.printStackTrace();
                         }
                     }
-                    tmp.add$$PHOSPHORTAGGED(MultiDTaintedArrayWithObjTag.boxIfNecessary(o), Configuration.controlFlowManager.getStack(false), new TaintedBooleanWithObjTag());
+                    InstrumentedJREMethodHelper.java_util_Collection_add$$PHOSPHORTAGGED_i(tmp, Taint.emptyTaint(), MultiDTaintedArrayWithObjTag.boxIfNecessary(o), Taint.emptyTaint(), retTmp);
                 } else {
                     break;
                 }
             }
             if(tmp != null) {
                 in.clear();
-                tmp.add$$PHOSPHORTAGGED(tmp, Configuration.controlFlowManager.getStack(false), new TaintedBooleanWithObjTag());
+                //The below seems extremely buggy so I didn't port this
+//                tmp.add$$PHOSPHORTAGGED(tmp, Configuration.controlFlowManager.getStack(false), new TaintedBooleanWithObjTag());
+                throw new UnsupportedOperationException();
             }
         }
         return in;
@@ -108,6 +112,7 @@ public final class NativeHelper {
     public static Collection ensureIsBoxedObjTags(Collection in) {
         if(in != null) {
             Collection tmp = null;
+            TaintedBooleanWithObjTag retTmp = new TaintedBooleanWithObjTag();
             for(Object o : in) {
                 if(o == null) {
                     break;
@@ -121,14 +126,14 @@ public final class NativeHelper {
                             ex.printStackTrace();
                         }
                     }
-                    tmp.add$$PHOSPHORTAGGED(MultiDTaintedArrayWithObjTag.boxIfNecessary(o), new TaintedBooleanWithObjTag());
+                    InstrumentedJREMethodHelper.java_util_Collection_add$$PHOSPHORTAGGED_i(tmp, Taint.emptyTaint(), MultiDTaintedArrayWithObjTag.boxIfNecessary(o), Taint.emptyTaint(), retTmp);
                 } else {
                     break;
                 }
             }
             if(tmp != null) {
                 in.clear();
-                tmp.add$$PHOSPHORTAGGED(tmp, new TaintedBooleanWithObjTag());
+                InstrumentedJREMethodHelper.java_util_Collection_add$$PHOSPHORTAGGED_i(tmp, Taint.emptyTaint(), tmp, Taint.emptyTaint(), retTmp);
             }
         }
         return in;
@@ -137,6 +142,7 @@ public final class NativeHelper {
     public static Collection ensureIsUnBoxedObjTags(Collection in) {
         if(in != null) {
             Collection tmp = null;
+            TaintedBooleanWithObjTag retTmp = new TaintedBooleanWithObjTag();
             for(Object o : in) {
                 if(o != null && MultiDTaintedArrayWithObjTag.isPrimitiveBoxClass(o.getClass()) != null) {
                     if(tmp == null) {
@@ -146,15 +152,14 @@ public final class NativeHelper {
                             ex.printStackTrace();
                         }
                     }
-                    tmp.add$$PHOSPHORTAGGED(MultiDTaintedArrayWithObjTag.unboxRaw(o), new TaintedBooleanWithObjTag());
-
+                    InstrumentedJREMethodHelper.java_util_Collection_add$$PHOSPHORTAGGED_i(tmp, Taint.emptyTaint(), MultiDTaintedArrayWithObjTag.unboxRaw(o), Taint.emptyTaint(), retTmp);
                 } else {
                     break;
                 }
             }
             if(tmp != null) {
                 in.clear();
-                tmp.add$$PHOSPHORTAGGED(tmp, new TaintedBooleanWithObjTag());
+                InstrumentedJREMethodHelper.java_util_Collection_add$$PHOSPHORTAGGED_i(tmp, Taint.emptyTaint(), tmp, Taint.emptyTaint(), retTmp);
             }
         }
         return in;
@@ -162,6 +167,7 @@ public final class NativeHelper {
 
     public static Collection ensureIsUnBoxedImplicitTracking(Collection in) {
         if(in != null) {
+            TaintedBooleanWithObjTag retTmp = new TaintedBooleanWithObjTag();
             Collection tmp = null;
             for(Object o : in) {
                 if(o != null && MultiDTaintedArrayWithObjTag.isPrimitiveBoxClass(o.getClass()) != null) {
@@ -172,15 +178,14 @@ public final class NativeHelper {
                             ex.printStackTrace();
                         }
                     }
-                    tmp.add$$PHOSPHORTAGGED(MultiDTaintedArrayWithObjTag.unboxRaw(o), Configuration.controlFlowManager.getStack(false), new TaintedBooleanWithObjTag());
-
+                    InstrumentedJREMethodHelper.java_util_Collection_add$$PHOSPHORTAGGED_i(tmp, Taint.emptyTaint(), MultiDTaintedArrayWithObjTag.unboxRaw(o), Taint.emptyTaint(), Configuration.controlFlowManager.getStack(false), retTmp);
                 } else {
                     break;
                 }
             }
             if(tmp != null) {
                 in.clear();
-                tmp.add$$PHOSPHORTAGGED(tmp, Configuration.controlFlowManager.getStack(false), new TaintedBooleanWithObjTag());
+                InstrumentedJREMethodHelper.java_util_Collection_add$$PHOSPHORTAGGED_i(tmp, Taint.emptyTaint(), tmp, Taint.emptyTaint(), Configuration.controlFlowManager.getStack(false), retTmp);
             }
         }
         return in;

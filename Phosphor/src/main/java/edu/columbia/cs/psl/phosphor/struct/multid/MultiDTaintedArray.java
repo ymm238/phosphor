@@ -1,13 +1,12 @@
 package edu.columbia.cs.psl.phosphor.struct.multid;
 
 import edu.columbia.cs.psl.phosphor.instrumenter.InvokedViaInstrumentation;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREMethodHelper;
 import edu.columbia.cs.psl.phosphor.runtime.Taint;
 import edu.columbia.cs.psl.phosphor.struct.*;
 import org.objectweb.asm.Type;
-import sun.security.pkcs11.wrapper.CK_ATTRIBUTE;
+//import sun.security.pkcs11.wrapper.CK_ATTRIBUTE;
 
-import java.lang.reflect.Array;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 import static edu.columbia.cs.psl.phosphor.instrumenter.TaintMethodRecord.BOX_IF_NECESSARY;
@@ -15,20 +14,21 @@ import static org.objectweb.asm.Opcodes.*;
 
 public abstract class MultiDTaintedArray {
 
-    public static CK_ATTRIBUTE[] unboxCK_ATTRIBUTE(CK_ATTRIBUTE[] in) throws NoSuchFieldException, SecurityException, IllegalArgumentException, IllegalAccessException {
-        if(in == null || in[0] == null) {
-            return null;
-        }
-        boolean needsFix = false;
-        Field f = in[0].getClass().getDeclaredField("pValue");
-        for(Object a : in) {
-            Object v = f.get(a);
-            if(v instanceof LazyArrayObjTags) {
-                f.set(a, MultiDTaintedArrayWithObjTag.unboxRaw(v));
-            }
-        }
-        return in;
-    }
+    //TODO handle this at some point...
+//    public static CK_ATTRIBUTE[] unboxCK_ATTRIBUTE(CK_ATTRIBUTE[] in) throws NoSuchFieldException, SecurityException, IllegalArgumentException, IllegalAccessException {
+//        if(in == null || in[0] == null) {
+//            return null;
+//        }
+//        boolean needsFix = false;
+//        Field f = in[0].getClass().getDeclaredField("pValue");
+//        for(Object a : in) {
+//            Object v = f.get(a);
+//            if(v instanceof LazyArrayObjTags) {
+//                f.set(a, MultiDTaintedArrayWithObjTag.unboxRaw(v));
+//            }
+//        }
+//        return in;
+//    }
 
     public static void main(String[] args) {
         // Object o =MULTIANEWARRAY(2, new int[]{10,20}, Type.BYTE);
@@ -427,7 +427,7 @@ public abstract class MultiDTaintedArray {
             LazyReferenceArrayObjTags d = new LazyReferenceArrayObjTags(t2, new LazyReferenceArrayObjTags[dim2]);
             ret.val[i] = d;
             for(int j = 0; j < dim2; j++) {
-                d.val[i] = new LazyReferenceArrayObjTags(t3, (Object[]) Array.newArray(component, dim3));
+                d.val[i] = new LazyReferenceArrayObjTags(t3, (Object[]) InstrumentedJREMethodHelper.java_lang_reflect_Array_newArray(component, dim3));
             }
         }
         return ret;
@@ -437,7 +437,7 @@ public abstract class MultiDTaintedArray {
     public static LazyReferenceArrayObjTags MULTIANEWARRAY_REFERENCE_2DIMS(int dim1, Taint t1, int dim2, Taint t2, Class<?> component) {
         LazyReferenceArrayObjTags ret = new LazyReferenceArrayObjTags(t1, new LazyReferenceArrayObjTags[dim1]);
         for(int i = 0; i < dim1; i++) {
-            ret.val[i] = new LazyReferenceArrayObjTags(t2, (Object[]) Array.newArray(component, dim2));
+            ret.val[i] = new LazyReferenceArrayObjTags(t2, (Object[]) InstrumentedJREMethodHelper.java_lang_reflect_Array_newArray(component, dim2));
         }
         return ret;
     }

@@ -1,7 +1,6 @@
 package edu.columbia.cs.psl.phosphor.instrumenter;
 
 import edu.columbia.cs.psl.phosphor.Configuration;
-import edu.columbia.cs.psl.phosphor.Instrumenter;
 import edu.columbia.cs.psl.phosphor.TaintUtils;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowPropagationPolicy;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
@@ -21,7 +20,10 @@ import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArrayWithObjTag;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.tree.*;
+import org.objectweb.asm.util.TraceClassVisitor;
 
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -117,12 +119,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
         addTaintMethod = true;
         this.generateExtraLVDebug = name.equals("java/lang/invoke/MethodType");
         this.fixLdcClass = (version & 0xFFFF) < Opcodes.V1_5;
-        if(Instrumenter.IS_KAFFE_INST && name.endsWith("java/lang/VMSystem")) {
-            access = access | Opcodes.ACC_PUBLIC;
-        } else if(Instrumenter.IS_HARMONY_INST && name.endsWith("java/lang/VMMemoryManager")) {
-            access = access & ~Opcodes.ACC_PRIVATE;
-            access = access | Opcodes.ACC_PUBLIC;
-        }
+
         if((access & Opcodes.ACC_ABSTRACT) != 0) {
             isAbstractClass = true;
         }
@@ -231,43 +228,6 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
         this.superName = superName;
     }
 
-    private void collectUninstrumentedInterfaceMethods(String[] interfaces) {
-        String superToCheck;
-        if(interfaces != null) {
-            for(String itfc : interfaces) {
-                superToCheck = itfc;
-                try {
-                    ClassNode cn = Instrumenter.classes.get(superToCheck);
-                    if(cn != null) {
-                        String[] s = new String[cn.interfaces.size()];
-                        s = cn.interfaces.toArray(s);
-                        collectUninstrumentedInterfaceMethods(s);
-                        continue;
-                    }
-                    Class<?> c = Class.forName(superToCheck.replace("/", "."), false, Instrumenter.loader);
-                    if(Instrumenter.isIgnoredClass(superToCheck)) {
-                        for(Method m : c.getDeclaredMethods()) {
-                            if(!Modifier.isPrivate(m.getModifiers())) {
-                                superMethodsToOverride.put(m.getName() + Type.getMethodDescriptor(m), m);
-                            }
-                        }
-                    }
-                    Class<?>[] in = c.getInterfaces();
-                    if(in != null && in.length > 0) {
-                        String[] s = new String[in.length];
-                        for(int i = 0; i < in.length; i++) {
-                            s[i] = Type.getInternalName(in[i]);
-                        }
-                        collectUninstrumentedInterfaceMethods(s);
-                    }
-                } catch(Exception ex) {
-                    break;
-                }
-
-            }
-        }
-    }
-
     @Override
     public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
         if((Opcodes.ACC_BRIDGE & access) != 0){
@@ -323,12 +283,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
         if(Configuration.WITH_ENUM_BY_VAL && className.equals("java/lang/Enum") && name.equals("clone")) {
             return null;
         }
-        if(Instrumenter.IS_KAFFE_INST && className.equals("java/lang/VMSystem")) {
-            access = access | Opcodes.ACC_PUBLIC;
-        } else if(Instrumenter.IS_HARMONY_INST && className.endsWith("java/lang/VMMemoryManager")) {
-            access = access & ~Opcodes.ACC_PRIVATE;
-            access = access | Opcodes.ACC_PUBLIC;
-        } else if((className.equals("java/lang/Integer") || className.equals("java/lang/Long")) && name.equals("getChars")) {
+        if((className.equals("java/lang/Integer") || className.equals("java/lang/Long")) && name.equals("getChars")) {
             access = access | Opcodes.ACC_PUBLIC;
         }
         String originalName = name;
@@ -594,8 +549,23 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
     @Override
     public void visitEnd() {
 
-        for(MethodNode mn : wrapperMethodsToAdd) {
-            mn.accept(this);
+        for (MethodNode mn : wrapperMethodsToAdd) {
+            try {
+                mn.accept(this);
+            } catch (Throwable t) {
+                System.err.println("Exception while adding wrapper method " + className + "." + mn.name + mn.desc);
+                t.printStackTrace();
+                PrintWriter pw;
+                try {
+                    pw = new PrintWriter("lastMethod.txt");
+                    TraceClassVisitor tcv = new TraceClassVisitor(null, new PhosphorTextifier(), pw);
+                    mn.accept(tcv);
+                    tcv.visitEnd();
+                    pw.flush();
+                } catch(FileNotFoundException e1) {
+                    e1.printStackTrace();
+                }
+            }
         }
 
         if((isEnum || className.equals("java/lang/Enum")) && Configuration.WITH_ENUM_BY_VAL) {
@@ -1035,7 +1005,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                             if(!loaded) {
                                 ga.visitVarInsn(t.getOpcode(Opcodes.ILOAD), idx);
                             }
-                            if(NATIVE_BOX_UNBOX && t.getSort() == Type.OBJECT && Instrumenter.isCollection(t.getInternalName())) {
+                            if(NATIVE_BOX_UNBOX && t.getSort() == Type.OBJECT && TaintUtils.isCollection(t.getInternalName())) {
                                 ga.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(NativeHelper.class), "ensureIsBoxedObjTags", "(Ljava/util/Collection;)Ljava/util/Collection;", false);
                                 ga.visitTypeInsn(Opcodes.CHECKCAST, t.getInternalName());
                             }
@@ -1091,7 +1061,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                         if(m.name.equals("<init>")) {
                             ga.visitMethodInsn(Opcodes.INVOKESPECIAL, className, m.name, newDesc, false);
                         } else {
-                            ga.visitMethodInsn(opcode, className, m.name + (useSuffixName ? TaintUtils.METHOD_SUFFIX : ""), newDesc, false);
+                            ga.visitMethodInsn(opcode, className, m.name + (useSuffixName ? TaintUtils.METHOD_SUFFIX : ""), newDesc, isInterface);
                         }
                         //unbox collections
                         idx = 0;
@@ -1100,7 +1070,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                         }
 
                         for(Type t : argTypes) {
-                            if(NATIVE_BOX_UNBOX && t.getSort() == Type.OBJECT && Instrumenter.isCollection(t.getInternalName())) {
+                            if(NATIVE_BOX_UNBOX && t.getSort() == Type.OBJECT && TaintUtils.isCollection(t.getInternalName())) {
                                 ga.visitVarInsn(t.getOpcode(Opcodes.ILOAD), idx);
                                 ga.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(NativeHelper.class), "ensureIsUnBoxedObjTags", "(Ljava/util/Collection;)Ljava/util/Collection;", false);
                                 ga.visitInsn(Opcodes.POP);
@@ -1454,9 +1424,9 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                 //call with uninst sentinel
                 descToCall = descToCall.substring(0, descToCall.indexOf(')')) + Type.getDescriptor(UninstrumentedTaintSentinel.class) + ")" + descToCall.substring(descToCall.indexOf(')') + 1);
                 ga.visitInsn(Opcodes.ACONST_NULL);
-                ga.visitMethodInsn(opcode, className, m.name, descToCall, false);
+                ga.visitMethodInsn(opcode, className, m.name, descToCall, isInterface);
             } else {
-                ga.visitMethodInsn(opcode, className, methodNameToCall, descToCall, false);
+                ga.visitMethodInsn(opcode, className, methodNameToCall, descToCall, isInterface);
             }
             if(origReturn != newReturn) {
                 if(origReturn.getSort() == Type.ARRAY && origReturn.getDimensions() > 1) {

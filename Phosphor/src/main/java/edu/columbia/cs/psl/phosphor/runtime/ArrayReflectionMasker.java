@@ -1,6 +1,7 @@
 package edu.columbia.cs.psl.phosphor.runtime;
 
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREMethodHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArray;
 import org.objectweb.asm.Type;
@@ -81,7 +82,7 @@ public class ArrayReflectionMasker {
                 ret.val = new LazyCharArrayObjTags(new char[len]);
                 return ret;
             }
-            ret.val = new LazyReferenceArrayObjTags((Object[]) Array.newArray(tmp, len));
+            ret.val = new LazyReferenceArrayObjTags((Object[]) InstrumentedJREMethodHelper.java_lang_reflect_Array_newArray(tmp, len));
             return ret;
         }
     }
@@ -157,7 +158,7 @@ public class ArrayReflectionMasker {
             }
         } else if(dims.length == 1) {
             if(t.getSort() == Type.OBJECT) {
-                _ret.val = new LazyReferenceArrayObjTags((Object[]) Array.newArray(clazz, dims[0]));
+                _ret.val = new LazyReferenceArrayObjTags((Object[]) InstrumentedJREMethodHelper.java_lang_reflect_Array_newArray(clazz, dims[0]));
             } else {
                 _ret.val = newInstanceForType(t.getSort(), dims[0]);
             }

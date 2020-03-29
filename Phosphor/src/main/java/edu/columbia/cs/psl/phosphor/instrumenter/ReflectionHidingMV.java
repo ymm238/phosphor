@@ -429,6 +429,10 @@ public class ReflectionHidingMV extends MethodVisitor implements Opcodes {
         if(className.equals("org/codehaus/groovy/vmplugin/v5/Java5") && methodName.equals("makeInterfaceTypes")) {
             return true;
         } else {
+            if(className.equals("jdk/internal/reflect/ReflectionFactory") || className.equals("java/lang/reflect/ReflectAccess")){
+                //Java >= 9
+                return true;
+            }
             return Configuration.TAINT_THROUGH_SERIALIZATION && !methodName.equals("getDeclaredSerialFields$$PHOSPHORTAGGED") &&
                     (className.startsWith("java/io/ObjectStreamClass") || className.equals("java/io/ObjectStreamField"));
         }

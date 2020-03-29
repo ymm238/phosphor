@@ -1,6 +1,6 @@
 package edu.gmu.swe.phosphor.ignored.maven;
 
-import edu.columbia.cs.psl.phosphor.Instrumenter;
+import edu.columbia.cs.psl.phosphor.instrumenter.Instrumenter;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;

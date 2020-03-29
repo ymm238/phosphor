@@ -1,5 +1,6 @@
 package edu.columbia.cs.psl.phosphor.runtime;
 
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREFieldHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.HashSet;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.Set;
@@ -241,18 +242,27 @@ public class TaintSourceWrapper<T extends AutoTaintLabel> {
 
     }
 
-    public static void setStringValueTag(String str, LazyCharArrayObjTags tags) {
+    public static void setStringValueTag(String str, LazyArrayObjTags tags) {
         if(str != null) {
-            str.valuePHOSPHOR_WRAPPER = tags;
+            if(InstrumentedJREFieldHelper.IS_JAVA_8){
+                InstrumentedJREFieldHelper.JAVA_8setvaluePHOSPHOR_WRAPPER(str, (LazyCharArrayObjTags) tags);
+            }
+            else{
+                InstrumentedJREFieldHelper.setvaluePHOSPHOR_WRAPPER(str, (LazyByteArrayObjTags) tags);
+            }
         }
     }
 
-    public static LazyCharArrayObjTags getStringValueTag(String str) {
+    public static LazyArrayObjTags getStringValueTag(String str) {
         if(str == null) {
             return null;
         } else {
-            return str.valuePHOSPHOR_WRAPPER;
-
+            if(InstrumentedJREFieldHelper.IS_JAVA_8){
+                return InstrumentedJREFieldHelper.JAVA_8getvaluePHOSPHOR_WRAPPER(str);
+            }
+            else {
+                return InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER(str);
+            }
         }
     }
 

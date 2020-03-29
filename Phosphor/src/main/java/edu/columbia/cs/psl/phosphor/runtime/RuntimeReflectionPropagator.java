@@ -2,6 +2,7 @@ package edu.columbia.cs.psl.phosphor.runtime;
 
 import edu.columbia.cs.psl.phosphor.TaintUtils;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREMethodHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.WeakHashMap;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArrayWithObjTag;
@@ -67,7 +68,7 @@ public class RuntimeReflectionPropagator {
             return get$$PHOSPHORTAGGED(f, fieldTaint, obj, objTaint, ret);
         }
         f.setAccessible(true);
-        f.get$$PHOSPHORTAGGED(fieldTaint, obj, objTaint, ctrl, ret);
+        InstrumentedJREMethodHelper.java_lang_reflect_Field_get$$PHOSPHORTAGGED(f, fieldTaint, obj, objTaint, ctrl, ret);
         return ret;
     }
 
@@ -111,7 +112,7 @@ public class RuntimeReflectionPropagator {
                 throw new IllegalArgumentException();
             }
         } else {
-            f.get$$PHOSPHORTAGGED(fieldTaint, obj, objTaint, _ret);
+            InstrumentedJREMethodHelper.java_lang_reflect_Field_get$$PHOSPHORTAGGED(f, fieldTaint, obj, objTaint, _ret);
         }
         return _ret;
     }

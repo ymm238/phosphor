@@ -1,7 +1,9 @@
 package edu.columbia.cs.psl.phosphor.runtime;
 
 
+import edu.columbia.cs.psl.phosphor.Configuration;
 import edu.columbia.cs.psl.phosphor.PreMain;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREFieldHelper;
 
 /**
  * Adapted from Apache harmony's String.java, under the
@@ -28,17 +30,17 @@ public class StringUtils {
      */
     public static boolean regionMatches(String thisStr, int thisStart, String string, int start,
                                         int length) {
-        if(string.value.length - start < length || start < 0) {
+        if(InstrumentedJREFieldHelper.getvalue(string).length - start < length || start < 0) {
             return false;
         }
-        if(thisStart < 0 || thisStr.value.length - thisStart < length) {
+        if(thisStart < 0 || InstrumentedJREFieldHelper.getvalue(thisStr).length - thisStart < length) {
             return false;
         }
         if(length <= 0) {
             return true;
         }
         for(int i = 0; i < length; ++i) {
-            if(thisStr.value[thisStart + i] != string.value[start + i]) {
+            if(InstrumentedJREFieldHelper.getvalue(thisStr)[thisStart + i] != InstrumentedJREFieldHelper.getvalue(string)[start + i]) {
                 return false;
             }
         }
@@ -46,11 +48,11 @@ public class StringUtils {
     }
 
     public static boolean _startsWith(String thisStr, String string) {
-        if(thisStr.value.length < string.value.length) {
+        if(InstrumentedJREFieldHelper.getvalue(thisStr).length < InstrumentedJREFieldHelper.getvalue(string).length) {
             return false;
         }
-        for(int i = 0; i < string.value.length; ++i) {
-            if(thisStr.value[i] != string.value[i]) {
+        for(int i = 0; i < InstrumentedJREFieldHelper.getvalue(string).length; ++i) {
+            if(InstrumentedJREFieldHelper.getvalue(thisStr)[i] != InstrumentedJREFieldHelper.getvalue(string)[i]) {
                 return false;
             }
         }

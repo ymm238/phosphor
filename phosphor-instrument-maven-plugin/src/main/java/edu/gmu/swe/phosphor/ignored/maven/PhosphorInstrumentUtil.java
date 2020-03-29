@@ -1,12 +1,10 @@
 package edu.gmu.swe.phosphor.ignored.maven;
 
-import edu.columbia.cs.psl.phosphor.Instrumenter;
-import edu.columbia.cs.psl.phosphor.PhosphorOption;
-import edu.columbia.cs.psl.phosphor.org.apache.commons.cli.Option;
-import edu.columbia.cs.psl.phosphor.org.apache.commons.cli.Options;
 import edu.columbia.cs.psl.phosphor.struct.SinglyLinkedList;
-import edu.columbia.cs.psl.phosphor.struct.harmony.util.HashMap;
-import edu.columbia.cs.psl.phosphor.struct.harmony.util.Map;
+import edu.columbia.cs.psl.phosphor.instrumenter.Instrumenter;
+import edu.columbia.cs.psl.phosphor.instrumenter.PhosphorOption;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
 import org.codehaus.plexus.util.FileUtils;
 
 import java.io.File;
@@ -15,6 +13,8 @@ import java.lang.instrument.Instrumentation;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.security.MessageDigest;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
@@ -82,14 +82,15 @@ public class PhosphorInstrumentUtil {
      * org.apache.commons.cli.Option that represents that configuration option
      */
     public static Map<String, Option> createPhosphorOptionMap(boolean isRuntimeInst) {
-        Map<String, Option> phosphorOptionMap = new HashMap<>();
-        Options options = PhosphorOption.createOptions(isRuntimeInst);
-        for(Option option : options.getOptions()) {
-            phosphorOptionMap.put(option.getOpt(), option);
-            if(option.hasLongOpt()) {
-                phosphorOptionMap.put(option.getLongOpt(), option);
-            }
-        }
+        Map<String, Option> phosphorOptionMap = new HashMap<String, Option>();
+//        Options options = PhosphorOption.createOptions(isRuntimeInst);
+//        for(Option option : options.getOptions()) {
+//            phosphorOptionMap.put(option.getOpt(), option);
+//            if(option.hasLongOpt()) {
+//                phosphorOptionMap.put(option.getLongOpt(), option);
+//            }
+//        }
+        //TODO
         return phosphorOptionMap;
     }
 

@@ -4,14 +4,13 @@ import edu.columbia.cs.psl.phosphor.control.ControlFlowManager;
 import edu.columbia.cs.psl.phosphor.control.standard.StandardControlFlowManager;
 import edu.columbia.cs.psl.phosphor.instrumenter.TaintTagFactory;
 import edu.columbia.cs.psl.phosphor.runtime.TaintSourceWrapper;
-import edu.columbia.cs.psl.phosphor.struct.harmony.util.EnumMap;
-import edu.columbia.cs.psl.phosphor.struct.harmony.util.StringBuilder;
 import org.apache.commons.cli.*;
 import org.objectweb.asm.ClassVisitor;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.util.EnumMap;
 
 public enum PhosphorOption {
 

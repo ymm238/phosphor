@@ -3,12 +3,12 @@ package edu.columbia.cs.psl.phosphor.runtime;
 import edu.columbia.cs.psl.phosphor.Configuration;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
 import edu.columbia.cs.psl.phosphor.instrumenter.InvokedViaInstrumentation;
+import edu.columbia.cs.psl.phosphor.instrumenter.TaintMethodRecord;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREFieldHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
 
 import java.io.Serializable;
 import java.lang.reflect.Array;
-
-import static edu.columbia.cs.psl.phosphor.instrumenter.TaintMethodRecord.*;
 
 public abstract class Taint<T> implements Serializable {
 
@@ -50,7 +50,11 @@ public abstract class Taint<T> implements Serializable {
 
     @SuppressWarnings("unchecked")
     public static <E> Taint<E> emptyTaint() {
-        return (Taint<E>) setTree.emptySet();
+        if (IGNORE_TAINTING) {
+            return null;
+        } else {
+            return (Taint<E>) setTree.emptySet();
+        }
     }
 
     /* Returns an array containing this taint's labels or label indices if the BitSet representation is used. The runtime
@@ -154,7 +158,7 @@ public abstract class Taint<T> implements Serializable {
         return ret;
     }
 
-    @InvokedViaInstrumentation(record = COMBINE_TAGS)
+    @InvokedViaInstrumentation(record = TaintMethodRecord.COMBINE_TAGS)
     public static <T> Taint<T> combineTags(Taint<T> t1, Taint<T> t2) {
         if(t1 == Taint.emptyTaint() && t2 == Taint.emptyTaint()) {
             return Taint.emptyTaint();
@@ -188,7 +192,7 @@ public abstract class Taint<T> implements Serializable {
         return tagsTaint.union(t1);
     }
 
-    @InvokedViaInstrumentation(record = COMBINE_TAGS_CONTROL)
+    @InvokedViaInstrumentation(record = TaintMethodRecord.COMBINE_TAGS_CONTROL)
     public static <T> Taint<T> combineTags(Taint<T> t1, ControlFlowStack tags) {
         if(tags == null) {
             return t1;
@@ -217,7 +221,7 @@ public abstract class Taint<T> implements Serializable {
     }
 
     @SuppressWarnings("rawtypes")
-    @InvokedViaInstrumentation(record = COMBINE_TAGS_ON_OBJECT_CONTROL)
+    @InvokedViaInstrumentation(record = TaintMethodRecord.COMBINE_TAGS_ON_OBJECT_CONTROL)
     public static void combineTagsOnObject(Object o, ControlFlowStack tags) {
         if(tags.copyTag().isEmpty() || IGNORE_TAINTING) {
             return;
@@ -233,14 +237,24 @@ public abstract class Taint<T> implements Serializable {
     }
 
     private static void combineTagsOnString(String str, ControlFlowStack ctrl) {
-        Taint existing = str.PHOSPHOR_TAG;
-        str.PHOSPHOR_TAG = combineTags(existing, ctrl);
+        Taint existing = InstrumentedJREFieldHelper.getPHOSPHOR_TAG(str);
+        InstrumentedJREFieldHelper.setPHOSPHOR_TAG(str, combineTags(existing, ctrl));
 
-        LazyCharArrayObjTags tags = str.valuePHOSPHOR_WRAPPER;
-        if (tags == null) {
-            str.valuePHOSPHOR_WRAPPER = new LazyCharArrayObjTags(str.value);
-            tags = str.valuePHOSPHOR_WRAPPER;
+        LazyArrayObjTags tags;
+        if(InstrumentedJREFieldHelper.IS_JAVA_8){
+            tags = InstrumentedJREFieldHelper.JAVA_8getvaluePHOSPHOR_WRAPPER(str);
+            if (tags == null) {
+                InstrumentedJREFieldHelper.JAVA_8setvaluePHOSPHOR_WRAPPER(str, new LazyCharArrayObjTags(InstrumentedJREFieldHelper.JAVA_8getvalue(str)));
+                tags = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER(str);
+            }
+        }else{
+            tags = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER(str);
+            if (tags == null) {
+                InstrumentedJREFieldHelper.setvaluePHOSPHOR_WRAPPER(str, new LazyByteArrayObjTags(InstrumentedJREFieldHelper.getvalue(str)));
+                tags = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER(str);
+            }
         }
+
         if (tags.taints == null) {
             tags.taints = new Taint[str.length()];
         }

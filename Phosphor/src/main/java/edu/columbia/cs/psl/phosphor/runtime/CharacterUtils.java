@@ -1,6 +1,8 @@
 package edu.columbia.cs.psl.phosphor.runtime;
 
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREFieldHelper;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREMethodHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
 
 public class CharacterUtils {
@@ -97,8 +99,8 @@ public class CharacterUtils {
     public static TaintedIntWithObjTag codePointAt$$PHOSPHORTAGGED(CharSequence seq, Taint seqTaint, int i, Taint t, TaintedIntWithObjTag ret) {
         try {
             ret.val = Character.codePointAt(seq, i);
-            if(seq instanceof String && ((String) seq).valuePHOSPHOR_WRAPPER != null && ((String) seq).valuePHOSPHOR_WRAPPER.taints != null) {
-                ret.taint = ((String) seq).valuePHOSPHOR_WRAPPER.taints[i];
+            if(seq instanceof String && InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq) != null && InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq).taints  != null) {
+                ret.taint = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq).taints [i];
             }
             return ret;
         } catch(StringIndexOutOfBoundsException ex) {
@@ -143,8 +145,8 @@ public class CharacterUtils {
     public static TaintedIntWithObjTag codePointBefore$$PHOSPHORTAGGED(CharSequence seq, Taint seqTaint, int i, Taint t, TaintedIntWithObjTag ret) {
         try {
             ret.val = Character.codePointBefore(seq, i);
-            if(seq instanceof String && ((String) seq).valuePHOSPHOR_WRAPPER != null && ((String) seq).valuePHOSPHOR_WRAPPER.taints != null) {
-                ret.taint = ((String) seq).valuePHOSPHOR_WRAPPER.taints[i];
+            if(seq instanceof String && InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq) != null && InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq).taints  != null) {
+                ret.taint = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq).taints [i];
             }
             return ret;
         } catch(StringIndexOutOfBoundsException ex) {
@@ -216,8 +218,8 @@ public class CharacterUtils {
     public static TaintedIntWithObjTag codePointAt$$PHOSPHORTAGGED(CharSequence seq, Taint seqTaint, int i, Taint t, ControlFlowStack ctrl, TaintedIntWithObjTag ret) {
         try {
             ret.val = Character.codePointAt(seq, i);
-            if(seq instanceof String && ((String) seq).valuePHOSPHOR_WRAPPER != null) {
-                ret.taint = seq.toString().valuePHOSPHOR_WRAPPER.taints[i];
+            if(seq instanceof String && InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq) != null) {
+                ret.taint = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER(seq.toString()).taints[i];
             }
             return ret;
         } catch(StringIndexOutOfBoundsException ex) {
@@ -338,7 +340,7 @@ public class CharacterUtils {
     }
 
     public static TaintedIntWithObjTag codePointBeforeImpl$$PHOSPHORTAGGED(LazyCharArrayObjTags tags, Taint tagsTaint, int i, Taint t, Taint t2, int i2, TaintedIntWithObjTag ret) {
-        ret.val = Character.codePointBeforeImpl(tags.val, i, i2);
+        ret.val = InstrumentedJREMethodHelper.java_lang_Character_codePointBeforeImpl(tags.val, i, i2);
         ret.taint = Taint.emptyTaint();
         if(tags.taints != null) {
             ret.taint = tags.taints[i];
@@ -347,7 +349,7 @@ public class CharacterUtils {
     }
 
     public static TaintedIntWithObjTag codePointBeforeImpl$$PHOSPHORTAGGED(LazyCharArrayObjTags tags, Taint tagsTaint, int i, Taint t, Taint t2, int i2, ControlFlowStack ctrl, TaintedIntWithObjTag ret) {
-        ret.val = Character.codePointBeforeImpl(tags.val, i, i2);
+        ret.val = InstrumentedJREMethodHelper.java_lang_Character_codePointBeforeImpl(tags.val, i, i2);
         ret.taint = Taint.emptyTaint();
         if(tags.taints != null) {
             ret.taint = tags.taints[i];
@@ -356,7 +358,7 @@ public class CharacterUtils {
     }
 
     public static TaintedIntWithObjTag toUpperCaseEx$$PHOSPHORTAGGED(int cp, Taint t, TaintedIntWithObjTag ret) {
-        ret.val = Character.toUpperCaseEx(cp);
+        ret.val = InstrumentedJREMethodHelper.java_lang_Character_toUpperCaseEx(cp);
         if(t != null) {
             ret.taint = t;
         } else {
@@ -366,7 +368,7 @@ public class CharacterUtils {
     }
 
     public static TaintedReferenceWithObjTag toUpperCaseCharArray$$PHOSPHORTAGGED(int c, Taint t, TaintedReferenceWithObjTag _ret) {
-        LazyCharArrayObjTags ret = new LazyCharArrayObjTags(Character.toUpperCaseCharArray(c));
+        LazyCharArrayObjTags ret = new LazyCharArrayObjTags(InstrumentedJREMethodHelper.java_lang_Character_toUpperCaseCharArray(c));
         if(t != null) {
             ret.taints = new Taint[ret.val.length];
             for(int i = 0; i < ret.taints.length; i++) {
@@ -383,7 +385,7 @@ public class CharacterUtils {
     }
 
     public static TaintedIntWithObjTag toUpperCaseEx$$PHOSPHORTAGGED(int c, Taint t, ControlFlowStack ctrl, TaintedIntWithObjTag ret) {
-        ret.val = Character.toUpperCaseEx(c);
+        ret.val = InstrumentedJREMethodHelper.java_lang_Character_toUpperCaseEx(c);
         if(t != null) {
             ret.taint = t;
         } else {
@@ -393,7 +395,7 @@ public class CharacterUtils {
     }
 
     public static TaintedReferenceWithObjTag toUpperCaseCharArray$$PHOSPHORTAGGED(Taint t, ControlFlowStack ctrl, int cp, TaintedReferenceWithObjTag _ret) {
-        LazyCharArrayObjTags ret = new LazyCharArrayObjTags(Character.toUpperCaseCharArray(cp));
+        LazyCharArrayObjTags ret = new LazyCharArrayObjTags(InstrumentedJREMethodHelper.java_lang_Character_toUpperCaseCharArray(cp));
         if(t != null) {
             ret.taints = new Taint[ret.val.length];
             for(int i = 0; i < ret.taints.length; i++) {
@@ -410,7 +412,7 @@ public class CharacterUtils {
     }
 
     public static TaintedIntWithObjTag codePointAtImpl$$PHOSPHORTAGGED(LazyCharArrayObjTags t, Taint refTaint, int index, Taint ti, int limit, Taint tl, TaintedIntWithObjTag ret) {
-        ret.val = Character.codePointAtImpl(t.val, index, limit);
+        ret.val = InstrumentedJREMethodHelper.java_lang_Character_codePointAtImpl(t.val, index, limit);
         ret.taint = Taint.emptyTaint();
         if(t.taints != null && t.taints[index] != null) {
             ret.taint = t.taints[index];
@@ -419,7 +421,7 @@ public class CharacterUtils {
     }
 
     public static TaintedIntWithObjTag codePointAtImpl$$PHOSPHORTAGGED(LazyCharArrayObjTags t, Taint refTaint, int index, Taint ti, int limit, Taint tl, ControlFlowStack ctrl, TaintedIntWithObjTag ret) {
-        ret.val = Character.codePointAtImpl(t.val, index, limit);
+        ret.val = InstrumentedJREMethodHelper.java_lang_Character_codePointAtImpl(t.val, index, limit);
         ret.taint = Taint.emptyTaint();
         if(t.taints != null && t.taints[index] != null) {
             ret.taint = t.taints[index];

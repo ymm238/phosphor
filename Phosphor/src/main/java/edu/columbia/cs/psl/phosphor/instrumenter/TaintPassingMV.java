@@ -1,7 +1,6 @@
 package edu.columbia.cs.psl.phosphor.instrumenter;
 
 import edu.columbia.cs.psl.phosphor.Configuration;
-import edu.columbia.cs.psl.phosphor.Instrumenter;
 import edu.columbia.cs.psl.phosphor.PhosphorInstructionInfo;
 import edu.columbia.cs.psl.phosphor.TaintUtils;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowPropagationPolicy;
@@ -56,6 +55,7 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
     private boolean isTaintlessArrayStore = false;
     private boolean doNotUnboxTaints;
     private boolean isAtStartOfExceptionHandler;
+    private boolean isRewrittenDescriptor = true;
 
     public TaintPassingMV(MethodVisitor mv, int access, String owner, String name, String descriptor, String signature,
                           String[] exceptions, String originalDesc, NeverNullArgAnalyzerAdapter analyzer,
@@ -78,6 +78,9 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
         this.originalMethodReturnType = Type.getReturnType(originalDesc);
         this.newReturnType = Type.getReturnType(descriptor);
         this.controlFlowPolicy = controlFlowPolicy;
+        if(descriptor.equals("()V") && !name.contains(TaintUtils.METHOD_SUFFIX)){
+            this.isRewrittenDescriptor = false;
+        }
     }
 
     @Override
@@ -185,7 +188,7 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
             desc = MultiDTaintedArray.getTypeForType(descType).getDescriptor();
         }
         boolean isIgnoredTaint = Instrumenter.isIgnoredClass(owner);
-        if(Instrumenter.isUninstrumentedField(owner, name) || isIgnoredTaint) {
+        if(TaintUtils.isUninstrumentedField(owner, name) || isIgnoredTaint) {
             switch(opcode) {
                 case GETFIELD:
                     super.visitInsn(POP);
@@ -569,7 +572,7 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                         ArrayList<Type> uninstNewWrapperArgs = new ArrayList<>();
                         if(isVirtual) {
                             newWrapperArgs.add(Type.getObjectType(implMethod.getOwner()));
-                            if(instantiatedMethodArgs.length == 0 || !instantiatedMethodArgs[0].getInternalName().equals(implMethod.getOwner())) {
+                            if(instantiatedMethodArgs.length == 0 || implMethod.getTag() == Opcodes.H_INVOKEINTERFACE || !instantiatedMethodArgs[0].getInternalName().equals(implMethod.getOwner())) {
                                 uninstNewWrapperArgs.add(Type.getObjectType(implMethod.getOwner()));
                             }
                         }
@@ -833,7 +836,7 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
             owner = "edu/columbia/cs/psl/phosphor/runtime/RuntimeBoxUnboxPropagator";
         }
         boolean isPreAllocatedReturnType = TaintUtils.isPreAllocReturnType(desc);
-        if(Instrumenter.isClassWithHashMapTag(owner) && name.equals("valueOf")) {
+        if(TaintUtils.isClassWithHashMapTag(owner) && name.equals("valueOf")) {
             Type[] args = Type.getArgumentTypes(desc);
             if(args[0].getSort() != Type.OBJECT) {
                 super.visitInsn(SWAP);
@@ -1594,5 +1597,13 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
             n += newArgType.getSize();
         }
         return paramTypes;
+    }
+
+    @Override
+    public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+        if(isRewrittenDescriptor && descriptor.equals("Ljdk/internal/HotSpotIntrinsicCandidate;")){
+            return null;
+        }
+        return super.visitAnnotation(descriptor, visible);
     }
 }

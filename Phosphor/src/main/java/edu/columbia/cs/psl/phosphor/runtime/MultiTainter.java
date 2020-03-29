@@ -1,6 +1,7 @@
 package edu.columbia.cs.psl.phosphor.runtime;
 
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREFieldHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArrayWithObjTag;
 
@@ -289,7 +290,7 @@ public final class MultiTainter {
         if(str == null) {
             return null;
         }
-        return str.valuePHOSPHOR_WRAPPER.taints;
+        return InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER(str).taints;
     }
 
     @SuppressWarnings("unused")

@@ -3,6 +3,7 @@ package edu.columbia.cs.psl.phosphor.struct;
 import edu.columbia.cs.psl.phosphor.Configuration;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
 import edu.columbia.cs.psl.phosphor.instrumenter.InvokedViaInstrumentation;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREMethodHelper;
 import edu.columbia.cs.psl.phosphor.runtime.Taint;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArray;
 
@@ -119,11 +120,11 @@ public final class LazyReferenceArrayObjTags extends LazyArrayObjTags {
                 ControlFlowStack dummy = Configuration.controlFlowManager.getStack(false);
                 dummy.disable();
                 for(int i = 0; i < len; i++) {
-                    val[i] = stream.readObject$$PHOSPHORTAGGED(Taint.emptyTaint(), dummy, ret).val; //Need to ensure that this doesn't get unwrapped!
+                    val[i] = InstrumentedJREMethodHelper.java_io_ObjectInputStream_readObject$$PHOSPHORTAGGED_i(stream, Taint.emptyTaint(), dummy, ret).val; //Need to ensure that this doesn't get unwrapped!
                 }
             } else {
                 for(int i = 0; i < len; i++) {
-                    val[i] = stream.readObject$$PHOSPHORTAGGED(Taint.emptyTaint(), ret).val; //Need to ensure that this doesn't get unwrapped!
+                    val[i] = InstrumentedJREMethodHelper.java_io_ObjectInputStream_readObject$$PHOSPHORTAGGED_i(stream, Taint.emptyTaint(), ret).val; //Need to ensure that this doesn't get unwrapped!
                 }
             }
         }

@@ -52,7 +52,8 @@ public class PreMain {
         inst.addTransformer(new ClassSupertypeReadingTransformer());
         RUNTIME_INST = true;
         if(args != null) {
-            PhosphorOption.configure(true, parseArgs(args));
+            throw new UnsupportedOperationException("Args not currently supported");
+//            PhosphorOption.configure(true, parseArgs(args));
         }
         if(System.getProperty("phosphorCacheDirectory") != null) {
             Configuration.CACHE_DIR = System.getProperty("phosphorCacheDirectory");
@@ -143,7 +144,8 @@ public class PreMain {
                     if(SerializationFixingCV.isApplicable(className)) {
                         _cv = new SerializationFixingCV(_cv, className);
                     }
-                    _cv = new ClinitRetransformClassVisitor(_cv);
+                    //TODO fix initialization order crashes
+//                    _cv = new ClinitRetransformClassVisitor(_cv);
                     if(isiFace) {
                         _cv = new TaintTrackingClassVisitor(_cv, skipFrames, fields, nonBridgeMethodsErasedReturnTypes, methodsToReduceSizeOf);
                     } else {

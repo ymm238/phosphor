@@ -10,11 +10,13 @@ import edu.columbia.cs.psl.phosphor.struct.harmony.util.ArrayList;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.List;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.StringBuilder;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArray;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
 import org.objectweb.asm.signature.SignatureReader;
 import org.objectweb.asm.signature.SignatureVisitor;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.MethodNode;
 
+import java.io.InputStream;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 
@@ -628,4 +630,5 @@ public class TaintUtils {
     public static boolean containsTaint(String desc) {
         return desc.contains(Configuration.TAINT_TAG_DESC);
     }
+
 }

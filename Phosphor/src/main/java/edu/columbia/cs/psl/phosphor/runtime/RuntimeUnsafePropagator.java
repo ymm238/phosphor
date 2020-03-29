@@ -2,6 +2,7 @@ package edu.columbia.cs.psl.phosphor.runtime;
 
 import edu.columbia.cs.psl.phosphor.Configuration;
 import edu.columbia.cs.psl.phosphor.TaintUtils;
+import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREFieldHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArray;
 import sun.misc.Unsafe;
@@ -86,10 +87,10 @@ public class RuntimeUnsafePropagator {
                 cl = o.getClass();
             }
             if(cl != null) {
-                if(cl.$$PHOSPHOR_OFFSET_CACHE == null) {
-                    cl.$$PHOSPHOR_OFFSET_CACHE = getOffsetPairs(unsafe, cl);
+                if(InstrumentedJREFieldHelper.get$$PHOSPHOR_OFFSET_CACHE(cl) == null) {
+                    InstrumentedJREFieldHelper.set$$PHOSPHOR_OFFSET_CACHE(cl, getOffsetPairs(unsafe, cl));
                 }
-                for(OffsetPair pair : cl.$$PHOSPHOR_OFFSET_CACHE) {
+                for(OffsetPair pair : InstrumentedJREFieldHelper.get$$PHOSPHOR_OFFSET_CACHE(cl)) {
                     if(pair.origFieldOffset == offset && pair.isStatic == isStatic) {
                         return pair;
                     }

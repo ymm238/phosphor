@@ -23,6 +23,13 @@ import java.util.concurrent.*;
 import java.util.zip.*;
 
 public class Instrumenter {
+    // jmod magic number and version number, taken from java.base/jdk/internal/jmod/JmodFile.java
+    private static final int JMOD_MAJOR_VERSION = 0x01;
+    private static final int JMOD_MINOR_VERSION = 0x00;
+    public static final byte[] JMOD_MAGIC_NUMBER = {
+            0x4A, 0x4D, /* JM */
+            JMOD_MAJOR_VERSION, JMOD_MINOR_VERSION, /* version 1.0 */
+    };
 
     public static ClassLoader loader;
     public static boolean IS_KAFFE_INST = Boolean.parseBoolean(System.getProperty("KAFFE", "false"));
@@ -80,10 +87,12 @@ public class Instrumenter {
                 || clazz.startsWith("java/lang/Byte")
                 || clazz.startsWith("java/lang/Short");
     }
-
+    
     public static boolean isIgnoredClass(String owner) {
         return Configuration.taintTagFactory.isIgnoredClass(owner)
                 || (Configuration.ADDL_IGNORE != null && StringUtils.startsWith(owner, Configuration.ADDL_IGNORE))
+                || StringUtils.startsWith(owner, "jdk/internal/module/SystemModules")
+                || StringUtils.startsWith(owner, "jdk/internal/misc/UnsafeConstants")
                 || StringUtils.startsWith(owner, "java/lang/Object")
                 || StringUtils.startsWith(owner, "java/lang/Boolean")
                 || StringUtils.startsWith(owner, "java/lang/Character")
@@ -104,6 +113,7 @@ public class Instrumenter {
                 || StringUtils.startsWith(owner, "sun/awt/image/codec/")
                 || StringUtils.startsWith(owner, "com/sun/image/codec/")
                 || StringUtils.startsWith(owner, "sun/reflect/Reflection") //was on last
+                || owner.equals("jdk/internal/reflect/Reflection")
                 || owner.equals("java/lang/reflect/Proxy") //was on last
                 || StringUtils.startsWith(owner, "sun/reflection/annotation/AnnotationParser") //was on last
                 || StringUtils.startsWith(owner, "sun/reflect/MethodAccessor") //was on last
@@ -138,7 +148,7 @@ public class Instrumenter {
                     cn.name = name;
                     cn.superName = superName;
                     cn.interfaces = new java.util.ArrayList<>(java.util.Arrays.asList(interfaces));
-                    Instrumenter.classes.put(name, cn);
+                    classes.put(name, cn);
                 }
             }, ClassReader.SKIP_CODE);
             is.close();
@@ -165,9 +175,9 @@ public class Instrumenter {
             is.close();
             buffer.flush();
             PreMain.PCLoggingTransformer transformer = new PreMain.PCLoggingTransformer();
-            byte[] ret = transformer.transform(Instrumenter.loader, path, null, null, buffer.toByteArray());
+            byte[] ret = transformer.transform(loader, path, null, null, buffer.toByteArray());
             if(addlTransformer != null) {
-                byte[] ret2 = addlTransformer.transform(Instrumenter.loader, path, null, null, ret);
+                byte[] ret2 = addlTransformer.transform(loader, path, null, null, ret);
                 if(ret2 != null) {
                     ret = ret2;
                 }
@@ -315,7 +325,7 @@ public class Instrumenter {
 
         if(f.isDirectory()) {
             toWait.addAll(processDirectory(f, rootOutputDir, true, executor));
-        } else if(inputFolder.endsWith(".jar") || inputFolder.endsWith(".zip") || inputFolder.endsWith(".war")) {
+        } else if(inputFolder.endsWith(".jar") || inputFolder.endsWith(".zip") || inputFolder.endsWith(".war")|| inputFolder.endsWith(".jmod")) {
             toWait.addAll(processZip(f, rootOutputDir, executor));
         } else if(inputFolder.endsWith(".class")) {
             toWait.addAll(processClass(f, rootOutputDir, executor));
@@ -393,7 +403,7 @@ public class Instrumenter {
                 ret.addAll(processDirectory(fi, thisOutputDir, false, executor));
             } else if(fi.getName().endsWith(".class")) {
                 ret.addAll(processClass(fi, thisOutputDir, executor));
-            } else if(fi.getName().endsWith(".jar") || fi.getName().endsWith(".zip") || fi.getName().endsWith(".war")) {
+            } else if(fi.getName().endsWith(".jar") || fi.getName().endsWith(".zip") || fi.getName().endsWith(".war") || fi.getName().endsWith(".jmod")) {
                 ret.addAll(processZip(fi, thisOutputDir, executor));
             } else {
                 File dest = new File(thisOutputDir.getPath() + File.separator + fi.getName());
@@ -458,15 +468,20 @@ public class Instrumenter {
             LinkedList<Future<Result>> ret = new LinkedList<>();
             final ZipFile zip = new ZipFile(f);
             ZipOutputStream zos;
-            zos = new ZipOutputStream(new FileOutputStream(outputDir.getPath() + File.separator + f.getName()));
+            FileOutputStream os = new FileOutputStream(outputDir.getPath() + File.separator + f.getName());
+            zos = new ZipOutputStream(os);
             if(unCompressed) {
                 zos.setLevel(ZipOutputStream.STORED);
+            }
+            if(f.getName().endsWith(".jmod")){
+                //Write magic number
+                os.write(JMOD_MAGIC_NUMBER);
             }
             java.util.Enumeration<? extends ZipEntry> entries = zip.entries();
             while(entries.hasMoreElements()) {
                 final ZipEntry e = entries.nextElement();
 
-                if(e.getName().endsWith(".class")) {
+                if(e.getName().endsWith(".class") && !e.getName().endsWith("module-info.class")) {
                     if(ANALYZE_ONLY) {
                         analyzeClass(zip.getInputStream(e));
                     } else {
@@ -660,6 +675,9 @@ public class Instrumenter {
             return true;
         }
         if(name.equals("wait") && desc.equals("(JI)V")) {
+            return true;
+        }
+        if(owner.equals("jdk/internal/reflect/Reflection") && name.equals("getCallerClass")){
             return true;
         }
         return Configuration.IMPLICIT_TRACKING && owner.equals("java/lang/invoke/MethodHandle")

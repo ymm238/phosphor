@@ -2,9 +2,9 @@ package edu.columbia.cs.psl.phosphor.struct.multid;
 
 import edu.columbia.cs.psl.phosphor.runtime.Taint;
 import edu.columbia.cs.psl.phosphor.struct.*;
+import edu.columbia.cs.psl.phosphor.struct.harmony.util.HashSet;
 import org.objectweb.asm.Type;
 
-import java.util.HashSet;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -622,7 +622,7 @@ public abstract class MultiDTaintedArrayWithObjTag {
                 Object[] _in = (Object[]) in;
                 TaintedBooleanWithObjTag tmpRet = new TaintedBooleanWithObjTag();
                 for(int i = 0; i < _in.length; i++) {
-                    if(done.add$$PHOSPHORTAGGED(_in[i], tmpRet).val) {
+                    if(done.add(_in[i])) {
                         _in[i] = boxIfNecessary(_in[i], done);
                     }
                 }
