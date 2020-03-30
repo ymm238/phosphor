@@ -1,6 +1,7 @@
 package edu.columbia.cs.psl.phosphor.instrumenter;
 
 import edu.columbia.cs.psl.phosphor.Configuration;
+import edu.columbia.cs.psl.phosphor.Instrumenter;
 import edu.columbia.cs.psl.phosphor.PhosphorInstructionInfo;
 import edu.columbia.cs.psl.phosphor.TaintUtils;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowPropagationPolicy;
@@ -187,8 +188,8 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
         if(descType.getSort() == Type.ARRAY && descType.getDimensions() > 1) {
             desc = MultiDTaintedArray.getTypeForType(descType).getDescriptor();
         }
-        boolean isIgnoredTaint = Instrumenter.isIgnoredClass(owner);
-        if(TaintUtils.isUninstrumentedField(owner, name) || isIgnoredTaint) {
+        boolean isIgnoredTaint = Instrumenter.isIgnoredClass(owner) || Instrumenter.isIgnoredClassWithStubsButNoTracking(owner);
+        if(Instrumenter.isUninstrumentedField(owner, name) || isIgnoredTaint) {
             switch(opcode) {
                 case GETFIELD:
                     super.visitInsn(POP);
@@ -719,18 +720,18 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                         String nameH = ((Handle) o).getName();
                         boolean isVirtual = (((Handle) o).getTag() == Opcodes.H_INVOKEVIRTUAL) || ((Handle) o).getTag() == Opcodes.H_INVOKESPECIAL || ((Handle) o).getTag() == Opcodes.H_INVOKEINTERFACE;
 
-                        if(!Instrumenter.isIgnoredClass(((Handle) o).getOwner()) && !Instrumenter.isIgnoredMethod(((Handle) o).getOwner(), nameH, ((Handle) o).getDesc()) &&
+                        if (!Instrumenter.isIgnoredClass(((Handle) o).getOwner()) && !Instrumenter.isIgnoredClassWithStubsButNoTracking(((Handle) o).getOwner()) && !Instrumenter.isIgnoredMethod(((Handle) o).getOwner(), nameH, ((Handle) o).getDesc()) &&
                                 !TaintUtils.remapMethodDescAndIncludeReturnHolder(isVirtual, ((Handle) o).getDesc()).equals(((Handle) o).getDesc())) {
                             bsmArgs[k] = new Handle(((Handle) o).getTag(), ((Handle) o).getOwner(), nameH + (nameH.equals("<init>") ? "" : TaintUtils.METHOD_SUFFIX), TaintUtils.remapMethodDescAndIncludeReturnHolder(isVirtual, ((Handle) o).getDesc()), ((Handle) o).isInterface());
                         }
-                    } else if(o instanceof Type) {
+                    } else if (o instanceof Type) {
                         Type t = (Type) o;
                         bsmArgs[k] = Type.getMethodType(TaintUtils.remapMethodDescAndIncludeReturnHolder(true, t.getDescriptor()));
                     }
                 }
             }
         }
-        if(hasNewName && !Instrumenter.isIgnoredClass(bsm.getOwner())) {
+        if(hasNewName && !Instrumenter.isIgnoredClass(bsm.getOwner()) && !Instrumenter.isIgnoredClassWithStubsButNoTracking(bsm.getOwner())) {
             if(!Instrumenter.isIgnoredMethod(bsm.getOwner(), bsm.getName(), bsm.getDesc()) && !TaintUtils.remapMethodDescAndIncludeReturnHolder(true, bsm.getDesc()).equals(bsm.getDesc())) {
                 bsm = new Handle(bsm.getTag(), bsm.getOwner(), bsm.getName() + TaintUtils.METHOD_SUFFIX, TaintUtils.remapMethodDescAndIncludeReturnHolder(true, bsm.getDesc()), bsm.isInterface());
             }
@@ -836,7 +837,7 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
             owner = "edu/columbia/cs/psl/phosphor/runtime/RuntimeBoxUnboxPropagator";
         }
         boolean isPreAllocatedReturnType = TaintUtils.isPreAllocReturnType(desc);
-        if(TaintUtils.isClassWithHashMapTag(owner) && name.equals("valueOf")) {
+        if(Instrumenter.isClassWithHashMapTag(owner) && name.equals("valueOf")) {
             Type[] args = Type.getArgumentTypes(desc);
             if(args[0].getSort() != Type.OBJECT) {
                 super.visitInsn(SWAP);
@@ -899,12 +900,12 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                 String calledOn = callee.getInternalName();
                 try {
                     Class<?> in = Class.forName(calledOn.replace('/', '.'), false, TaintPassingMV.class.getClassLoader());
-                    if(!in.isInterface() && !Instrumenter.isIgnoredClass(calledOn)) {
+                    if(!in.isInterface() && !Instrumenter.isIgnoredClass(calledOn) && !Instrumenter.isIgnoredClassWithStubsButNoTracking(calledOn)) {
                         owner = calledOn;
                     }
                 } catch(Throwable t) {
                     //if not ignored, can still make an invokeinterface
-                    if(!Instrumenter.isIgnoredClass(calledOn)) {
+                    if(!Instrumenter.isIgnoredClass(calledOn) && !Instrumenter.isIgnoredClassWithStubsButNoTracking(calledOn)) {
                         owner = Type.getInternalName(TaintedWithObjTag.class);
                         opcode = INVOKEINTERFACE;
                         isInterface = true;
@@ -925,7 +926,7 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
         }
         //to reduce how much we need to wrap, we will only rename methods that actually have a different descriptor
         boolean hasNewName = !TaintUtils.remapMethodDescAndIncludeReturnHolder(opcode != INVOKESTATIC, desc).equals(desc);
-        if((Instrumenter.isIgnoredClass(owner) || Instrumenter.isIgnoredMethod(owner, name, desc)) && !isInternalTaintingClass(owner) && !name.equals("arraycopy")) {
+        if((Instrumenter.isIgnoredClass(owner) || Instrumenter.isIgnoredClassWithStubsButNoTracking(owner) || Instrumenter.isIgnoredMethod(owner, name, desc)) && !isInternalTaintingClass(owner) && !name.equals("arraycopy")) {
             Type[] args = Type.getArgumentTypes(desc);
             int argsSize = 0;
             //Remove all taints
