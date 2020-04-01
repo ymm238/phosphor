@@ -1,6 +1,5 @@
 package edu.columbia.cs.psl.phosphor;
 
-import edu.columbia.cs.psl.phosphor.instrumenter.Instrumenter;
 import edu.columbia.cs.psl.phosphor.struct.SinglyLinkedList;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.ConcurrentHashMap;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.HashSet;
@@ -258,7 +257,7 @@ public class BasicSourceSinkManager extends SourceSinkManager {
                 // Add any methods from this class that are directly listed as auto taint methods
                 set.addAll(baseMethods.get(className));
             }
-            ClassNode cn = TaintUtils.getClassNode(className);
+            ClassNode cn = Instrumenter.getClassNode(className);
             if(cn != null) {
                 if(cn.interfaces != null) {
                     // Add all auto taint methods from interfaces implemented by this class
@@ -290,7 +289,7 @@ public class BasicSourceSinkManager extends SourceSinkManager {
                 if(baseMethods.containsKey(curClassName) && baseMethods.get(curClassName).contains(methodName)) {
                     return curClassName;
                 }
-                ClassNode cn = TaintUtils.getClassNode(curClassName);
+                ClassNode cn = Instrumenter.getClassNode(curClassName);
                 if(cn != null) {
                     if(cn.interfaces != null) {
                         // Enqueue interfaces implemented by the current class

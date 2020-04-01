@@ -1,6 +1,7 @@
 package edu.columbia.cs.psl.phosphor.instrumenter;
 
 import edu.columbia.cs.psl.phosphor.Configuration;
+import edu.columbia.cs.psl.phosphor.Instrumenter;
 import edu.columbia.cs.psl.phosphor.TaintUtils;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowPropagationPolicy;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
@@ -233,11 +234,38 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
 
     @Override
     public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
-        if((Opcodes.ACC_BRIDGE & access) != 0){
-            String key = name + "."+desc.substring(0, desc.indexOf(')'));
-            if(nonBridgeMethodsReturnsErased.contains(key) || !visitedBridgeMethodsReturnsErased.add(key)) {
+        if(isUninstMethods){
+            //subclasses might try to override final methods with bridge methods. these are benign. simple fix is
+            //to just make the super method non-final, the subclass will call into it anyway.
+            access = access & ~Opcodes.ACC_FINAL;
+        }
+        if ((Opcodes.ACC_BRIDGE & access) != 0) {
+            String key = name + "." + desc.substring(0, desc.indexOf(')'));
+            if (nonBridgeMethodsReturnsErased.contains(key) || !visitedBridgeMethodsReturnsErased.add(key)) {
                 //don't instrument this, it's just a bridge method and when we rewrite the return type it will already exist
-                return super.visitMethod(access, name, desc, signature, exceptions);
+                final MethodVisitor prev = super.visitMethod(access, name, desc, signature, exceptions);
+                if (isUninstMethods && !nonBridgeMethodsReturnsErased.contains(key)) {
+                    //... but if we are not instrumenting things, we will need to make sure to generate the wrapper for it
+                    MethodNode rawMethod = new MethodNode(Configuration.ASM_VERSION, access, name, desc, signature, exceptions) {
+                        @Override
+                        public void visitEnd() {
+                            super.visitEnd();
+                            this.accept(prev);
+                        }
+                    };
+                    boolean isRewrittenDesc = !TaintUtils.remapMethodDesc((access & Opcodes.ACC_STATIC) == 0, desc).equals(desc);
+                    Type newReturnType = Type.getReturnType(TaintUtils.remapMethodDesc(false, desc));
+                    boolean requiresNoChange = !isRewrittenDesc && newReturnType.equals(Type.getReturnType(desc));
+                    MethodNode wrapper = new MethodNode(access, name, desc, signature, exceptions);
+                    if (!requiresNoChange && !name.equals("<clinit>") && !(name.equals("<init>") && !isRewrittenDesc)) {
+                        methodsToAddWrappersFor.add(wrapper);
+                    }
+                    forMore.put(wrapper, rawMethod);
+                    return rawMethod;
+                }
+                else{
+                    return prev;
+                }
             }
         }
         if(name.equals("hashCode") && desc.equals("()I")) {
@@ -1011,7 +1039,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                             if(!loaded) {
                                 ga.visitVarInsn(t.getOpcode(Opcodes.ILOAD), idx);
                             }
-                            if(NATIVE_BOX_UNBOX && t.getSort() == Type.OBJECT && TaintUtils.isCollection(t.getInternalName())) {
+                            if(NATIVE_BOX_UNBOX && t.getSort() == Type.OBJECT && Instrumenter.isCollection(t.getInternalName())) {
                                 ga.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(NativeHelper.class), "ensureIsBoxedObjTags", "(Ljava/util/Collection;)Ljava/util/Collection;", false);
                                 ga.visitTypeInsn(Opcodes.CHECKCAST, t.getInternalName());
                             }
@@ -1076,7 +1104,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                         }
 
                         for(Type t : argTypes) {
-                            if(NATIVE_BOX_UNBOX && t.getSort() == Type.OBJECT && TaintUtils.isCollection(t.getInternalName())) {
+                            if(NATIVE_BOX_UNBOX && t.getSort() == Type.OBJECT && Instrumenter.isCollection(t.getInternalName())) {
                                 ga.visitVarInsn(t.getOpcode(Opcodes.ILOAD), idx);
                                 ga.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(NativeHelper.class), "ensureIsUnBoxedObjTags", "(Ljava/util/Collection;)Ljava/util/Collection;", false);
                                 ga.visitInsn(Opcodes.POP);
@@ -1276,6 +1304,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
         }
         newDesc.append(wrapped.toString());
         newDesc.append(")").append(newReturn.getDescriptor());
+
 
         MethodVisitor mv;
         if(m.name.equals("<init>")) {

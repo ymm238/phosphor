@@ -1,6 +1,5 @@
 package edu.columbia.cs.psl.phosphor;
 
-import edu.columbia.cs.psl.phosphor.instrumenter.Instrumenter;
 import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -15,7 +14,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -39,9 +41,12 @@ public class JVMInstrumenter {
         String dir = "/Library/Java/JavaVirtualMachines/jdk-14-fastdebug.jdk/Contents/Home/jmods/";
         String outDir = "/Users/jon/Documents/GMU/Projects/phosphor/jmods-inst/";
         //First: instrument the jmods
-        System.out.println("Inst: " + dir);
-        Instrumenter.main(new String[]{dir, outDir});
-
+        boolean onlyDoJavaBase = true;
+        if(args.length == 0) {
+            onlyDoJavaBase = false;
+            System.out.println("Inst: " + dir);
+            Instrumenter.main(new String[]{dir, outDir});
+        }
         HashMap<String, byte[]> checkSums = new HashMap<>();
         LinkedList<Module> notReady = new LinkedList<>();
         Files.list(Paths.get(outDir)).forEach((path -> {
@@ -59,7 +64,13 @@ public class JVMInstrumenter {
             Iterator<Module> iter = notReady.iterator();
             while (iter.hasNext()) {
                 Module mod = iter.next();
-                if (mod.updateHashes(checkSums)) {
+                if(onlyDoJavaBase){
+                    if(mod.classNode.module.name.equals("java.base")) {
+                        mod.updateHashesOnDisk();
+                    }
+                    iter.remove();
+                }
+                else if (mod.updateHashes(checkSums)) {
                     System.out.println("Updated: " + mod.path.getFileName() + " " + bytesToHex(mod.hash) + " remaining: " + notReady.size());
                     iter.remove();
                 }
@@ -154,32 +165,49 @@ public class JVMInstrumenter {
                 boolean addPhosphor = this.classNode.module.name.equals("java.base");
 
                 if (addPhosphor) {
+                    Iterator<ModuleExportNode> exportedModulesIter = classNode.module.exports.iterator();
+                    while(exportedModulesIter.hasNext()){
+                        ModuleExportNode node = exportedModulesIter.next();
+                        if(node.packaze.startsWith("edu/columbia")){
+                            exportedModulesIter.remove();
+                        }
+                    }
                     //Add export
                     classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor", 0, null));
                     classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor/runtime", 0, null));
                     classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor/struct", 0, null));
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/instrumenter");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/runtime/proxied");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/struct");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/instrumenter/analyzer");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/org/objectweb/asm/tree");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/org/objectweb/asm/signature");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/control");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/struct/multid");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/runtime");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/org/apache/commons/cli");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/org/objectweb/asm/analysis");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/org/objectweb/asm");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/org/objectweb/asm/util");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/struct/harmony/util");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/instrumenter/analyzer/type");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/control/graph");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/org/objectweb/asm/tree/analysis");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/org/objectweb/asm/commons");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/control/standard");
-                    classNode.module.packages.add("edu/columbia/cs/psl/phosphor/instrumenter/asm");
 
+                    Iterator<String> packagesIter = classNode.module.packages.iterator();
+                    while(packagesIter.hasNext()){
+                        String node = packagesIter.next();
+                        if(node.startsWith("edu/columbia")){
+                            packagesIter.remove();
+                        }
+                    }
+                    String packages = "edu.columbia.cs.psl.phosphor\n" +
+                            "edu.columbia.cs.psl.phosphor.control\n" +
+                            "edu.columbia.cs.psl.phosphor.control.graph\n" +
+                            "edu.columbia.cs.psl.phosphor.control.standard\n" +
+                            "edu.columbia.cs.psl.phosphor.control.type\n" +
+                            "edu.columbia.cs.psl.phosphor.instrumenter\n" +
+                            "edu.columbia.cs.psl.phosphor.instrumenter.analyzer\n" +
+                            "edu.columbia.cs.psl.phosphor.instrumenter.asm\n" +
+                            "edu.columbia.cs.psl.phosphor.org.apache.commons.cli\n" +
+                            "edu.columbia.cs.psl.phosphor.org.objectweb.asm\n" +
+                            "edu.columbia.cs.psl.phosphor.org.objectweb.asm.analysis\n" +
+                            "edu.columbia.cs.psl.phosphor.org.objectweb.asm.commons\n" +
+                            "edu.columbia.cs.psl.phosphor.org.objectweb.asm.signature\n" +
+                            "edu.columbia.cs.psl.phosphor.org.objectweb.asm.tree\n" +
+                            "edu.columbia.cs.psl.phosphor.org.objectweb.asm.tree.analysis\n" +
+                            "edu.columbia.cs.psl.phosphor.org.objectweb.asm.util\n" +
+                            "edu.columbia.cs.psl.phosphor.runtime\n" +
+                            "edu.columbia.cs.psl.phosphor.runtime.proxied\n" +
+                            "edu.columbia.cs.psl.phosphor.struct\n" +
+                            "edu.columbia.cs.psl.phosphor.struct.harmony.util\n" +
+                            "edu.columbia.cs.psl.phosphor.struct.multid";
+                    for(String s: packages.split("\n")){
+                        classNode.module.packages.add(s.replace('.','/'));
+                    }
                 }
                 this.hash = null;
                 ZipOutputStream zos;

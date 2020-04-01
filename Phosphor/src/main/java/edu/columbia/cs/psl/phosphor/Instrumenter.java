@@ -11,7 +11,6 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.io.*;
-import java.lang.instrument.ClassFileTransformer;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -42,11 +41,13 @@ public class Instrumenter {
     static String curPath;
     static int nTotal = 0;
     static int n = 0;
-    private static ClassFileTransformer addlTransformer;
+//    private static ClassFileTransformer addlTransformer;
 
     static {
-        classes.putAll(ClassSupertypeReadingTransformer.classNodes);
-        ClassSupertypeReadingTransformer.classNodes = null;
+        //This is only needed for Java < 9, it causes crashes otherwise
+        //Figure out a clever hack to put this in something that gets ignored when we import to java.base?
+//        classes.putAll(ClassSupertypeReadingTransformer.classNodes);
+//        ClassSupertypeReadingTransformer.classNodes = null;
     }
 
     private Instrumenter() {
@@ -178,12 +179,12 @@ public class Instrumenter {
             buffer.flush();
             PreMain.PCLoggingTransformer transformer = new PreMain.PCLoggingTransformer();
             byte[] ret = transformer.transform(loader, path, null, null, buffer.toByteArray());
-            if(addlTransformer != null) {
-                byte[] ret2 = addlTransformer.transform(loader, path, null, null, ret);
-                if(ret2 != null) {
-                    ret = ret2;
-                }
-            }
+//            if(addlTransformer != null) {
+//                byte[] ret2 = addlTransformer.transform(loader, path, null, null, ret);
+//                if(ret2 != null) {
+//                    ret = ret2;
+//                }
+//            }
             curPath = null;
             return ret;
         } catch(Exception ex) {
@@ -529,6 +530,7 @@ public class Instrumenter {
 
                     outEntry.setSize(Files.size(newFile));
                     CRC32 crc = new CRC32();
+                    //noinspection Since15
                     crc.update(Files.readAllBytes(newFile));
                     outEntry.setCrc(crc.getValue());
                     zos.putNextEntry(outEntry);

@@ -27,7 +27,7 @@ public class ClassSupertypeReadingTransformer extends PhosphorBaseTransformer {
                 cn.superName = superName;
                 cn.interfaces = new ArrayList<>(Arrays.asList(interfaces));
                 if(classNodes == null) {
-                    TaintUtils.classes.put(name, cn);
+                    Instrumenter.classes.put(name, cn);
                 } else {
                     classNodes.put(name, cn);
                 }

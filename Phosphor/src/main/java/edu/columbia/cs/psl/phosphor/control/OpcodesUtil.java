@@ -1,5 +1,6 @@
 package edu.columbia.cs.psl.phosphor.control;
 
+import edu.columbia.cs.psl.phosphor.Instrumenter;
 import edu.columbia.cs.psl.phosphor.TaintUtils;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.HashSet;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.LinkedList;
@@ -361,7 +362,7 @@ public class OpcodesUtil {
         if(owner == null || name == null || descriptor == null) {
             throw new NullPointerException();
         }
-        ClassNode cn = TaintUtils.getClassNode(owner);
+        ClassNode cn = Instrumenter.getClassNode(owner);
         if(cn != null) {
             for(MethodNode methodNode : cn.methods) {
                 if(descriptor.equals(methodNode.desc) && name.equals(methodNode.name)) {
@@ -390,7 +391,7 @@ public class OpcodesUtil {
         ancestors.add(className);
         while(true) {
             String currentClass = ancestors.getLast();
-            ClassNode classNode = TaintUtils.getClassNode(currentClass);
+            ClassNode classNode = Instrumenter.getClassNode(currentClass);
             if(classNode == null) {
                 return null;
             } else if(classNode.superName == null) {

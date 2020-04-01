@@ -1,6 +1,7 @@
 package edu.columbia.cs.psl.phosphor.runtime;
 
 import edu.columbia.cs.psl.phosphor.Configuration;
+import edu.columbia.cs.psl.phosphor.Instrumenter;
 import edu.columbia.cs.psl.phosphor.TaintUtils;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
 import edu.columbia.cs.psl.phosphor.instrumenter.InvokedViaInstrumentation;
@@ -16,8 +17,6 @@ import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.*;
-
-import static edu.columbia.cs.psl.phosphor.instrumenter.TaintMethodRecord.*;
 
 public class ReflectionMasker {
 
