@@ -32,11 +32,12 @@ public enum TaintMethodRecord implements MethodRecord {
     GET_TAINT_COPY_SIMPLE(Opcodes.INVOKESTATIC, TaintUtils.class, "getTaintCopySimple", TAINT_TAG_OBJ_CLASS, false, Object.class),
     ENSURE_UNBOXED(Opcodes.INVOKESTATIC, TaintUtils.class, "ensureUnboxed", Object.class, false, Object.class),
     // Methods from ControlFlowStack
-    CONTROL_STACK_ENABLE(Opcodes.INVOKEVIRTUAL, ControlFlowStack.class, "enable", Void.TYPE, false),
-    CONTROL_STACK_DISABLE(Opcodes.INVOKEVIRTUAL, ControlFlowStack.class, "disable", Void.TYPE, false),
-    CONTROL_STACK_POP_FRAME(Opcodes.INVOKEVIRTUAL, ControlFlowStack.class, "popFrame", Void.TYPE, false),
-    CONTROL_STACK_PUSH_FRAME(Opcodes.INVOKEVIRTUAL, ControlFlowStack.class, "pushFrame", Void.TYPE, false),
-    CONTROL_STACK_COPY_TOP(Opcodes.INVOKEVIRTUAL, ControlFlowStack.class, "copyTop", ControlFlowStack.class, false),
+    CONTROL_STACK_ENABLE(INVOKEVIRTUAL, ControlFlowStack.class, "enable", Void.TYPE, false),
+    CONTROL_STACK_DISABLE(INVOKEVIRTUAL, ControlFlowStack.class, "disable", Void.TYPE, false),
+    CONTROL_STACK_POP_FRAME(INVOKEVIRTUAL, ControlFlowStack.class, "popFrame", Void.TYPE, false),
+    CONTROL_STACK_PUSH_FRAME(INVOKEVIRTUAL, ControlFlowStack.class, "pushFrame", Void.TYPE, false),
+    CONTROL_STACK_COPY_TOP(INVOKEVIRTUAL, ControlFlowStack.class, "copyTop", ControlFlowStack.class, false),
+    CONTROL_STACK_UNINSTRUMENTED_WRAPPER(INVOKEVIRTUAL, ControlFlowStack.class, "enteringUninstrumentedWrapper", Void.TYPE, false),
     // Methods from MultiDTaintedArray
     BOX_IF_NECESSARY(Opcodes.INVOKESTATIC, MultiDTaintedArray.class, "boxIfNecessary", Object.class, false, Object.class),
     // Methods from ReflectionMasker

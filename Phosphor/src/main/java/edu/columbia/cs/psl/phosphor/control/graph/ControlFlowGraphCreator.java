@@ -1,6 +1,5 @@
 package edu.columbia.cs.psl.phosphor.control.graph;
 
-import edu.columbia.cs.psl.phosphor.TaintUtils;
 import edu.columbia.cs.psl.phosphor.control.OpcodesUtil;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.*;
 import org.objectweb.asm.Opcodes;
@@ -248,7 +247,7 @@ public abstract class ControlFlowGraphCreator<V extends BasicBlock> {
                 for(LabelNode label : ((LookupSwitchInsnNode) lastInsn).labels) {
                     addNonDefaultCaseSwitchEdge(currentBasicBlock, labelBlockMap.get(label));
                 }
-            } else if(TaintUtils.isReturnOpcode(lastInsn.getOpcode())) {
+            } else if(OpcodesUtil.isReturnOpcode(lastInsn.getOpcode())) {
                 addStandardEdgeToExitPoint(currentBasicBlock);
             } else if(lastInsn.getOpcode() == Opcodes.ATHROW) {
                 // TODO considered whether the throw exception is caught
@@ -277,7 +276,7 @@ public abstract class ControlFlowGraphCreator<V extends BasicBlock> {
     }
 
     /**
-     * @param method                         the method whose instructions and exception handlers are to analyzed
+     * @param method                         the method whose instructions and exception handlers are to be analyzed
      * @param explicitlyThrownExceptionTypes a mapping from ATHROW instructions to the name (as returned by
      *                                       Class.getName(), but with the '.'s replaced with '/'s) of the type of
      *                                       exception that they throw, if an ATHROW instruction does not have an entry
