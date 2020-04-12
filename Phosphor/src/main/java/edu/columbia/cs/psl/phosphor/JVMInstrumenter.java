@@ -26,7 +26,6 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-//import jdk.tools.jlink.internal.ImageFileCreator;
 public class JVMInstrumenter {
     // jmod magic number and version number, taken from java.base/jdk/internal/jmod/JmodFile.java
     private static final int JMOD_MAJOR_VERSION = 0x01;

@@ -4,11 +4,13 @@ import edu.columbia.cs.psl.phosphor.instrumenter.TaintTrackingClassVisitor;
 import edu.columbia.cs.psl.phosphor.runtime.StringUtils;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.*;
 import org.apache.commons.cli.CommandLine;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.*;
+import org.objectweb.asm.commons.ModuleHashesAttribute;
+import org.objectweb.asm.commons.ModuleResolutionAttribute;
+import org.objectweb.asm.commons.ModuleTargetAttribute;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.ModuleExportNode;
 
 import java.io.*;
 import java.net.MalformedURLException;
@@ -740,6 +742,47 @@ public class Instrumenter {
         }
     }
 
+    public static byte[] transformJavaBaseModuleInfo(InputStream is) throws IOException {
+        ClassNode classNode = new ClassNode();
+        ClassReader cr = new ClassReader(is);
+        java.util.List<Attribute> attrs = new java.util.ArrayList<>();
+        attrs.add(new ModuleTargetAttribute());
+        attrs.add(new ModuleResolutionAttribute());
+        attrs.add(new ModuleHashesAttribute());
+
+        cr.accept(classNode, attrs.toArray(new Attribute[0]), 0);
+        //Add export
+        classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor", 0, null));
+        classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor/runtime", 0, null));
+        classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor/struct", 0, null));
+        String packages = "edu.columbia.cs.psl.phosphor\n" +
+                "edu.columbia.cs.psl.phosphor.control\n" +
+                "edu.columbia.cs.psl.phosphor.control.graph\n" +
+                "edu.columbia.cs.psl.phosphor.control.standard\n" +
+                "edu.columbia.cs.psl.phosphor.control.type\n" +
+                "edu.columbia.cs.psl.phosphor.instrumenter\n" +
+                "edu.columbia.cs.psl.phosphor.instrumenter.analyzer\n" +
+                "edu.columbia.cs.psl.phosphor.instrumenter.asm\n" +
+                "edu.columbia.cs.psl.phosphor.org.apache.commons.cli\n" +
+                "edu.columbia.cs.psl.phosphor.org.objectweb.asm\n" +
+                "edu.columbia.cs.psl.phosphor.org.objectweb.asm.analysis\n" +
+                "edu.columbia.cs.psl.phosphor.org.objectweb.asm.commons\n" +
+                "edu.columbia.cs.psl.phosphor.org.objectweb.asm.signature\n" +
+                "edu.columbia.cs.psl.phosphor.org.objectweb.asm.tree\n" +
+                "edu.columbia.cs.psl.phosphor.org.objectweb.asm.tree.analysis\n" +
+                "edu.columbia.cs.psl.phosphor.org.objectweb.asm.util\n" +
+                "edu.columbia.cs.psl.phosphor.runtime\n" +
+                "edu.columbia.cs.psl.phosphor.runtime.proxied\n" +
+                "edu.columbia.cs.psl.phosphor.struct\n" +
+                "edu.columbia.cs.psl.phosphor.struct.harmony.util\n" +
+                "edu.columbia.cs.psl.phosphor.struct.multid";
+        for(String s: packages.split("\n")){
+            classNode.module.packages.add(s.replace('.','/'));
+        }
+        ClassWriter cw = new ClassWriter(0);
+        classNode.accept(cw);
+        return cw.toByteArray();
+    }
     private static class Result {
         ZipEntry e;
         byte[] buf;

@@ -26,6 +26,7 @@
     <modules>
         <module>Phosphor</module>
         <module>phosphor-instrument-maven-plugin</module>
+        <module>phosphor-instrument-jlink-plugin</module>
         <module>integration-tests</module>
         <module>phosphor-microbench</module>
     </modules>
