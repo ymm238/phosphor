@@ -114,7 +114,7 @@ public class PreMain {
             TraceClassVisitor debugTracer = null;
             try {
                 try {
-                    ClassWriter cw = new HackyClassWriter(cr, ClassWriter.COMPUTE_MAXS);
+                    ClassWriter cw = new HackyClassWriter(null, ClassWriter.COMPUTE_MAXS);
                     ClassVisitor _cv = cw;
                     if(traceClass) {
                         System.out.println("Saving " + className + " to debug-preinst/");
@@ -173,8 +173,26 @@ public class PreMain {
                     cr.accept(_cv, ClassReader.EXPAND_FRAMES);
                     byte[] instrumentedBytes = cw.toByteArray();
                     if (!traceClass && (DEBUG || TaintUtils.VERIFY_CLASS_GENERATION)) {
+
                         ClassReader cr2 = new ClassReader(instrumentedBytes);
-                        cr2.accept(new CheckClassAdapter(new ClassWriter(0), true), ClassReader.EXPAND_FRAMES);
+                        try {
+                            cr2.accept(new CheckClassAdapter(new ClassWriter(0), true), ClassReader.EXPAND_FRAMES);
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                            File f = new File("debug-verify/" + className.replace("/", ".") + ".class");
+                            if (!f.getParentFile().isDirectory() && !f.getParentFile().mkdirs()) {
+                                System.err.println("Failed to make debug directory: " + f);
+                            } else {
+                                try {
+                                    FileOutputStream fos = new FileOutputStream(f);
+                                    fos.write(instrumentedBytes);
+                                    fos.close();
+                                } catch (Exception ex2) {
+                                    ex2.printStackTrace();
+                                }
+                                System.out.println("Saved broken class to " + f);
+                            }
+                        }
                     }
 
                     return instrumentedBytes;

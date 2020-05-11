@@ -23,7 +23,10 @@ import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArrayWithObjTag;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.tree.*;
+import org.objectweb.asm.util.TraceClassVisitor;
 
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -598,8 +601,23 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
     @Override
     public void visitEnd() {
 
-        for(MethodNode mn : wrapperMethodsToAdd) {
-            mn.accept(this);
+        for (MethodNode mn : wrapperMethodsToAdd) {
+            try {
+                mn.accept(cv);
+            } catch (Throwable t) {
+                System.err.println("Exception while adding wrapper method " + className + "." + mn.name + mn.desc);
+                t.printStackTrace();
+                PrintWriter pw;
+                try {
+                    pw = new PrintWriter("lastMethod.txt");
+                    TraceClassVisitor tcv = new TraceClassVisitor(null, new PhosphorTextifier(), pw);
+                    mn.accept(tcv);
+                    tcv.visitEnd();
+                    pw.close();
+                } catch(FileNotFoundException e1) {
+                    e1.printStackTrace();
+                }
+            }
         }
 
         if((isEnum || className.equals("java/lang/Enum")) && Configuration.WITH_ENUM_BY_VAL) {
@@ -1299,17 +1317,25 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
         newDesc.append(")").append(newReturn.getDescriptor());
 
         MethodVisitor mv;
-        if(m.name.equals("<init>")) {
-            mv = super.visitMethod(m.access & ~Opcodes.ACC_NATIVE, m.name, newDesc.toString(), m.signature, exceptions);
+        int acc = m.access & ~Opcodes.ACC_NATIVE;
+        boolean isInterfaceMethod = isInterface;
+        if(isInterfaceMethod && forMore.get(m) != null && forMore.get(m).instructions.size() > 0){
+            isInterfaceMethod = false;
+        }
+        if (!isInterfaceMethod) {
+            acc = acc & ~Opcodes.ACC_ABSTRACT;
+        }
+        if (m.name.equals("<init>")) {
+            mv = super.visitMethod(acc, m.name, newDesc.toString(), m.signature, exceptions);
         } else {
-            mv = super.visitMethod(m.access & ~Opcodes.ACC_NATIVE, m.name + TaintUtils.METHOD_SUFFIX + (skipUnboxing ? "$$NOUNBOX" : ""), newDesc.toString(), m.signature, exceptions);
+            mv = super.visitMethod(acc, m.name + TaintUtils.METHOD_SUFFIX + (skipUnboxing ? "$$NOUNBOX" : ""), newDesc.toString(), m.signature, exceptions);
         }
         NeverNullArgAnalyzerAdapter an = new NeverNullArgAnalyzerAdapter(className, m.access, m.name, newDesc.toString(), mv);
         MethodVisitor soc = new SpecialOpcodeRemovingMV(an, ignoreFrames, m.access, className, newDesc.toString(), fixLdcClass);
-        LocalVariableManager lvs = new LocalVariableManager(m.access, newDesc.toString(), soc, an, mv, generateExtraLVDebug);
+        LocalVariableManager lvs = new LocalVariableManager(acc, newDesc.toString(), soc, an, mv, generateExtraLVDebug);
         lvs.setPrimitiveArrayAnalyzer(new PrimitiveArrayAnalyzer(newReturn));
-        GeneratorAdapter ga = new GeneratorAdapter(lvs, m.access, m.name + TaintUtils.METHOD_SUFFIX, newDesc.toString());
-        if(isInterface) {
+        GeneratorAdapter ga = new GeneratorAdapter(lvs, acc, m.name + TaintUtils.METHOD_SUFFIX, newDesc.toString());
+        if(isInterfaceMethod) {
             ga.visitEnd();
             return;
         }
