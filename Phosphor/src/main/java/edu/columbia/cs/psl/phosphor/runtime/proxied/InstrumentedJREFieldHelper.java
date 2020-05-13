@@ -4,14 +4,12 @@ import edu.columbia.cs.psl.phosphor.runtime.RuntimeUnsafePropagator;
 import edu.columbia.cs.psl.phosphor.runtime.Taint;
 import edu.columbia.cs.psl.phosphor.struct.LazyByteArrayObjTags;
 import edu.columbia.cs.psl.phosphor.struct.LazyCharArrayObjTags;
-import edu.columbia.cs.psl.phosphor.struct.LazyReferenceArrayObjTags;
 import edu.columbia.cs.psl.phosphor.struct.SinglyLinkedList;
 
 import java.lang.reflect.Method;
 
 public class InstrumentedJREFieldHelper {
 
-    public static boolean IS_JAVA_8 = false;
     private static RuntimeException _crash() {
         return new IllegalStateException("InstrumentedJREHelper not initialized");
     }
@@ -92,6 +90,7 @@ public class InstrumentedJREFieldHelper {
     public static Method getPHOSPHOR_TAGmethod(Method method) {
         throw _crash();
     }
+
     public static void setPHOSPHOR_TAGmethod(Method method, Method v) {
         throw _crash();
     }
@@ -100,7 +99,7 @@ public class InstrumentedJREFieldHelper {
         throw _crash();
     }
 
-    public static void setPHOSPHOR_TAGclass(Class<?> clazz, Class<?> v){
+    public static void setPHOSPHOR_TAGclass(Class<?> clazz, Class<?> v) {
         throw _crash();
     }
 

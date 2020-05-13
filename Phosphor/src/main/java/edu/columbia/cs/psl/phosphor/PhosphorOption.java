@@ -278,7 +278,15 @@ public enum PhosphorOption {
                 Configuration.ignoredMethods.add(commandLine.getOptionValue(optionName));
             }
         }
-    };
+    },
+    JAVA_8(new PhosphorOptionBuilder(null, true, true).alternativeName("java8")) {
+        @Override
+        public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
+            if (isPresent) {
+                Configuration.IS_JAVA_8 = true;
+            }
+        }
+    },;
 
     final String optionName;
     private final Option.Builder builder;

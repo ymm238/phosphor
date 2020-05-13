@@ -1,38 +1,33 @@
 package edu.columbia.cs.psl.phosphor.struct.multid;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+
 import edu.columbia.cs.psl.phosphor.instrumenter.InvokedViaInstrumentation;
 import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREMethodHelper;
 import edu.columbia.cs.psl.phosphor.runtime.Taint;
 import edu.columbia.cs.psl.phosphor.struct.*;
 import org.objectweb.asm.Type;
-//import sun.security.pkcs11.wrapper.CK_ATTRIBUTE;
 
-import java.lang.reflect.Method;
 
 import static edu.columbia.cs.psl.phosphor.instrumenter.TaintMethodRecord.BOX_IF_NECESSARY;
 import static org.objectweb.asm.Opcodes.*;
 
 public abstract class MultiDTaintedArray {
 
-    //TODO handle this at some point...
-//    public static CK_ATTRIBUTE[] unboxCK_ATTRIBUTE(CK_ATTRIBUTE[] in) throws NoSuchFieldException, SecurityException, IllegalArgumentException, IllegalAccessException {
-//        if(in == null || in[0] == null) {
-//            return null;
-//        }
-//        boolean needsFix = false;
-//        Field f = in[0].getClass().getDeclaredField("pValue");
-//        for(Object a : in) {
-//            Object v = f.get(a);
-//            if(v instanceof LazyArrayObjTags) {
-//                f.set(a, MultiDTaintedArrayWithObjTag.unboxRaw(v));
-//            }
-//        }
-//        return in;
-//    }
-
-    public static void main(String[] args) {
-        // Object o =MULTIANEWARRAY(2, new int[]{10,20}, Type.BYTE);
-        // System.out.println(o);
+    public static Object[] unboxCK_ATTRIBUTE(Object[] in) throws NoSuchFieldException, SecurityException, IllegalArgumentException, IllegalAccessException {
+        if(in == null || in[0] == null) {
+            return null;
+        }
+        boolean needsFix = false;
+        Field f = in[0].getClass().getDeclaredField("pValue");
+        for(Object a : in) {
+            Object v = f.get(a);
+            if(v instanceof LazyArrayObjTags) {
+                f.set(a, MultiDTaintedArrayWithObjTag.unboxRaw(v));
+            }
+        }
+        return in;
     }
 
     // ============ START GENERATED ===========

@@ -57,6 +57,7 @@ public class Configuration {
     public static Class<? extends ClassVisitor> PRIOR_CLASS_VISITOR = null;
     public static ControlFlowManager controlFlowManager;
     public static boolean QUIET_MODE = false;
+    public static boolean IS_JAVA_8 = false;
 
     public static Set<String> ignoredMethods = new HashSet<>();
     /*

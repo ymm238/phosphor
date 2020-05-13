@@ -102,4 +102,8 @@ public class InstrumentedJREMethodHelper {
     public static TaintedReferenceWithObjTag java_lang_reflect_Field_get$$PHOSPHORTAGGED(Field f, Taint fieldTaint, Object obj, Taint objTaint, TaintedReferenceWithObjTag ret) {
         throw _crash();
     }
+
+    public static TaintedBooleanWithObjTag java_util_Collection_add$$PHOSPHORTAGGED(Collection tmp, ControlFlowStack stack, TaintedBooleanWithObjTag taintedBooleanWithObjTag) {
+        throw _crash();
+    }
 }

@@ -106,9 +106,7 @@ public final class NativeHelper {
             }
             if(tmp != null) {
                 in.clear();
-                //The below seems extremely buggy so I didn't port this
-//                tmp.add$$PHOSPHORTAGGED(tmp, Configuration.controlFlowManager.getStack(false), new TaintedBooleanWithObjTag());
-                throw new UnsupportedOperationException();
+                InstrumentedJREMethodHelper.java_util_Collection_add$$PHOSPHORTAGGED(tmp, Configuration.controlFlowManager.getStack(false), new TaintedBooleanWithObjTag());
             }
         }
         return in;

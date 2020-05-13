@@ -1,7 +1,6 @@
 package edu.columbia.cs.psl.phosphor.runtime;
 
 
-import edu.columbia.cs.psl.phosphor.Configuration;
 import edu.columbia.cs.psl.phosphor.PreMain;
 import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREFieldHelper;
 

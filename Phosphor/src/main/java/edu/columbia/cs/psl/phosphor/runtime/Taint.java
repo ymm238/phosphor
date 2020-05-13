@@ -241,13 +241,13 @@ public abstract class Taint<T> implements Serializable {
         InstrumentedJREFieldHelper.setPHOSPHOR_TAG(str, combineTags(existing, ctrl));
 
         LazyArrayObjTags tags;
-        if(InstrumentedJREFieldHelper.IS_JAVA_8){
+        if(Configuration.IS_JAVA_8) {
             tags = InstrumentedJREFieldHelper.JAVA_8getvaluePHOSPHOR_WRAPPER(str);
             if (tags == null) {
                 InstrumentedJREFieldHelper.JAVA_8setvaluePHOSPHOR_WRAPPER(str, new LazyCharArrayObjTags(InstrumentedJREFieldHelper.JAVA_8getvalue(str)));
                 tags = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER(str);
             }
-        }else{
+        } else {
             tags = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER(str);
             if (tags == null) {
                 InstrumentedJREFieldHelper.setvaluePHOSPHOR_WRAPPER(str, new LazyByteArrayObjTags(InstrumentedJREFieldHelper.getvalue(str)));

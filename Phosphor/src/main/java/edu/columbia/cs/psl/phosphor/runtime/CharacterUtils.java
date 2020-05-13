@@ -100,7 +100,7 @@ public class CharacterUtils {
         try {
             ret.val = Character.codePointAt(seq, i);
             if(seq instanceof String && InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq) != null && InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq).taints  != null) {
-                ret.taint = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq).taints [i];
+                ret.taint = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq).taints[i];
             }
             return ret;
         } catch(StringIndexOutOfBoundsException ex) {
@@ -146,7 +146,7 @@ public class CharacterUtils {
         try {
             ret.val = Character.codePointBefore(seq, i);
             if(seq instanceof String && InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq) != null && InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq).taints  != null) {
-                ret.taint = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq).taints [i];
+                ret.taint = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER((String) seq).taints[i];
             }
             return ret;
         } catch(StringIndexOutOfBoundsException ex) {

@@ -1013,11 +1013,86 @@ public class RuntimeBoxUnboxPropagator {
     }
 
     @SuppressWarnings("unused")
+    public static TaintedIntWithObjTag parseInt$$PHOSPHORTAGGED(CharSequence s, Taint sTaint, int beginIndex, Taint<?> tag, int endIndex, Taint<?> endTag, int radix, Taint<?> radixTag, TaintedIntWithObjTag ret) {
+        ret.val = Integer.parseInt(s, beginIndex, endIndex, radix);
+        ret.taint = sTaint;
+        return ret;
+    }
+
+    @SuppressWarnings("unused")
+    public static TaintedIntWithObjTag parseInt$$PHOSPHORTAGGED(CharSequence s, Taint sTaint, int beginIndex, Taint<?> tag, int endIndex, Taint<?> endTag, int radix, Taint<?> radixTag, ControlFlowStack ctrl, TaintedIntWithObjTag ret) {
+        try {
+            ret.val = Integer.parseInt(s, beginIndex, endIndex, radix);
+            ret.taint = sTaint;
+            return ret;
+        } catch(NumberFormatException ex) {
+
+            throw ex;
+        }
+    }
+    @SuppressWarnings("unused")
+    public static TaintedIntWithObjTag parseUnsignedInt$$PHOSPHORTAGGED(CharSequence s, Taint sTaint, int beginIndex, Taint<?> tag, int endIndex, Taint<?> endTag, int radix, Taint<?> radixTag, TaintedIntWithObjTag ret) {
+        ret.val = Integer.parseUnsignedInt(s, beginIndex, endIndex, radix);
+        ret.taint = sTaint;
+        return ret;
+    }
+
+    @SuppressWarnings("unused")
+    public static TaintedIntWithObjTag parseUnsignedInt$$PHOSPHORTAGGED(CharSequence s, Taint sTaint, int beginIndex, Taint<?> tag, int endIndex, Taint<?> endTag, int radix, Taint<?> radixTag, ControlFlowStack ctrl, TaintedIntWithObjTag ret) {
+        try {
+            ret.val = Integer.parseUnsignedInt(s, beginIndex, endIndex, radix);
+            ret.taint = sTaint;
+            return ret;
+        } catch (NumberFormatException ex) {
+
+            throw ex;
+        }
+    }
+
+    @SuppressWarnings("unused")
+    public static TaintedLongWithObjTag parseLong$$PHOSPHORTAGGED(CharSequence s, Taint sTaint, int beginIndex, Taint<?> tag, int endIndex, Taint<?> endTag, int radix, Taint<?> radixTag, TaintedLongWithObjTag ret) {
+        ret.val = Long.parseLong(s, beginIndex, endIndex, radix);
+        ret.taint = sTaint;
+        return ret;
+    }
+
+    @SuppressWarnings("unused")
+    public static TaintedLongWithObjTag parseLong$$PHOSPHORTAGGED(CharSequence s, Taint sTaint, int beginIndex, Taint<?> tag, int endIndex, Taint<?> endTag, int radix, Taint<?> radixTag, ControlFlowStack ctrl, TaintedLongWithObjTag ret) {
+        try {
+            ret.val = Long.parseLong(s, beginIndex, endIndex, radix);
+            ret.taint = sTaint;
+            return ret;
+        } catch(NumberFormatException ex) {
+
+            throw ex;
+        }
+    }
+    @SuppressWarnings("unused")
+    public static TaintedLongWithObjTag parseUnsignedLong$$PHOSPHORTAGGED(CharSequence s, Taint sTaint, int beginIndex, Taint<?> tag, int endIndex, Taint<?> endTag, int radix, Taint<?> radixTag, TaintedLongWithObjTag ret) {
+        ret.val = Long.parseUnsignedLong(s, beginIndex, endIndex, radix);
+        ret.taint = sTaint;
+        return ret;
+    }
+
+    @SuppressWarnings("unused")
+    public static TaintedLongWithObjTag parseUnsignedLong$$PHOSPHORTAGGED(CharSequence s, Taint sTaint, int beginIndex, Taint<?> tag, int endIndex, Taint<?> endTag, int radix, Taint<?> radixTag, ControlFlowStack ctrl, TaintedLongWithObjTag ret) {
+        try {
+            ret.val = Long.parseUnsignedLong(s, beginIndex, endIndex, radix);
+            ret.taint = sTaint;
+            return ret;
+        } catch (NumberFormatException ex) {
+
+            throw ex;
+        }
+    }
+
+    @SuppressWarnings("unused")
     public static TaintedIntWithObjTag parseInt$$PHOSPHORTAGGED(String s, Taint sTaint, int radix, Taint<?> tag, TaintedIntWithObjTag ret) {
         ret.val = Integer.parseInt(s, radix);
         ret.taint = getCombinedTaint(s, sTaint);
         return ret;
     }
+
 
     @SuppressWarnings("unused")
     public static TaintedLongWithObjTag parseLong$$PHOSPHORTAGGED(String s, Taint sTaint, int radix, Taint<?> tag, ControlFlowStack ctrl, TaintedLongWithObjTag ret) {

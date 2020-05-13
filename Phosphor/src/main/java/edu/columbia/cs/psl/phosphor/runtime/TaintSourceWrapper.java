@@ -1,5 +1,6 @@
 package edu.columbia.cs.psl.phosphor.runtime;
 
+import edu.columbia.cs.psl.phosphor.Configuration;
 import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREFieldHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.HashSet;
@@ -242,25 +243,35 @@ public class TaintSourceWrapper<T extends AutoTaintLabel> {
 
     }
 
-    public static void setStringValueTag(String str, LazyArrayObjTags tags) {
-        if(str != null) {
-            if(InstrumentedJREFieldHelper.IS_JAVA_8){
-                InstrumentedJREFieldHelper.JAVA_8setvaluePHOSPHOR_WRAPPER(str, (LazyCharArrayObjTags) tags);
+    public static void setStringTaintTag(String str, Taint tag) {
+        if (str != null) {
+            if (Configuration.IS_JAVA_8) {
+                LazyCharArrayObjTags chars = InstrumentedJREFieldHelper.JAVA_8getvaluePHOSPHOR_WRAPPER(str);
+                chars.setTaints(tag);
+            } else {
+                LazyByteArrayObjTags chars = InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER(str);
+                chars.setTaints(tag);
             }
-            else{
+        }
+    }
+
+    public static void setStringValueTag(String str, LazyArrayObjTags tags) {
+        if (str != null) {
+            if (Configuration.IS_JAVA_8) {
+                InstrumentedJREFieldHelper.JAVA_8setvaluePHOSPHOR_WRAPPER(str, (LazyCharArrayObjTags) tags);
+            } else {
                 InstrumentedJREFieldHelper.setvaluePHOSPHOR_WRAPPER(str, (LazyByteArrayObjTags) tags);
             }
         }
     }
 
     public static LazyArrayObjTags getStringValueTag(String str) {
-        if(str == null) {
+        if (str == null) {
             return null;
         } else {
-            if(InstrumentedJREFieldHelper.IS_JAVA_8){
+            if (Configuration.IS_JAVA_8) {
                 return InstrumentedJREFieldHelper.JAVA_8getvaluePHOSPHOR_WRAPPER(str);
-            }
-            else {
+            } else {
                 return InstrumentedJREFieldHelper.getvaluePHOSPHOR_WRAPPER(str);
             }
         }

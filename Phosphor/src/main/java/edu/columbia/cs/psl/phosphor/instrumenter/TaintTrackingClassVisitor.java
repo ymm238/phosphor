@@ -36,6 +36,7 @@ import static edu.columbia.cs.psl.phosphor.Configuration.TAINT_TAG_INTERNAL_NAME
 import static edu.columbia.cs.psl.phosphor.Configuration.controlFlowManager;
 import static edu.columbia.cs.psl.phosphor.instrumenter.TaintMethodRecord.*;
 import static org.objectweb.asm.Opcodes.ALOAD;
+import static org.objectweb.asm.Opcodes.CHECKCAST;
 
 /**
  * CV responsibilities: Add a field to classes to track each instance's taint
@@ -260,8 +261,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                     }
                     forMore.put(wrapper, rawMethod);
                     return rawMethod;
-                }
-                else{
+                } else {
                     return prev;
                 }
             }
@@ -731,21 +731,8 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                     Type taintType = MultiDTaintedArray.getTypeForType(Type.getType(char[].class));
                     mv.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(Configuration.class), "autoTainter", Type.getDescriptor(TaintSourceWrapper.class));
                     mv.visitVarInsn(ALOAD, 0);
-                    mv.visitInsn(Opcodes.DUP);
-                    mv.visitFieldInsn(Opcodes.GETFIELD, className, "value", "[C");
-                    //A
-                    mv.visitTypeInsn(Opcodes.NEW, taintType.getInternalName());
-                    //A T
-                    mv.visitInsn(Opcodes.DUP_X1);
-                    //T A T
-                    mv.visitInsn(Opcodes.SWAP);
-                    mv.visitMethodInsn(Opcodes.INVOKESPECIAL, taintType.getInternalName(), "<init>", "([C)V", false);
-                    //T
-                    mv.visitInsn(Opcodes.DUP_X1);
-                    mv.visitFieldInsn(Opcodes.PUTFIELD, className, "value" + TaintUtils.TAINT_WRAPPER_FIELD, taintType.getDescriptor());
-
                     mv.visitVarInsn(ALOAD, 1);
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, Type.getInternalName(TaintSourceWrapper.class), "combineTaintsOnArray", "(Ljava/lang/Object;" + Configuration.TAINT_TAG_DESC + ")V", false);
+                    mv.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(TaintSourceWrapper.class), "setStringTaintTag", "(Ljava/lang/String;" + Configuration.TAINT_TAG_DESC + ")V", false);
                 } else if((className.equals(TaintPassingMV.INTEGER_NAME) || className.equals(TaintPassingMV.LONG_NAME)
                         || className.equals(TaintPassingMV.FLOAT_NAME) || className.equals(TaintPassingMV.DOUBLE_NAME))) {
                     //For primitive types, also set the "value" field
@@ -1408,7 +1395,8 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                 }
                 if (!skipUnboxing) {
                     if(t.getDescriptor().equals("[Lsun/security/pkcs11/wrapper/CK_ATTRIBUTE;")) {
-                        ga.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(MultiDTaintedArray.class), "unboxCK_ATTRIBUTE", "([Lsun/security/pkcs11/wrapper/CK_ATTRIBUTE;)[Lsun/security/pkcs11/wrapper/CK_ATTRIBUTE;", false);
+                        ga.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(MultiDTaintedArray.class), "unboxCK_ATTRIBUTE", "([Ljava/lang/Object;)[Ljava/lang/Object;", false);
+                        ga.visitTypeInsn(CHECKCAST,"[Lsun/security/pkcs11/wrapper/CK_ATTRIBUTE;");
                     } else if(t.getDescriptor().equals("Ljava/lang/Object;") || (t.getSort() == Type.ARRAY && t.getElementType().getDescriptor().equals("Ljava/lang/Object;"))) {
                         // Need to make sure that it's not a boxed primitive array
                         ga.visitInsn(Opcodes.DUP);

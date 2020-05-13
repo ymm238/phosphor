@@ -271,7 +271,7 @@ public class ReflectionHidingMV extends MethodVisitor implements Opcodes {
                     }
                     break;
                 case "java/lang/reflect/Constructor":
-                    if(name.startsWith("newInstance")) {
+                    if(name.equals("newInstance$$PHOSPHORTAGGED")) {
                         maskConstructorNewInstance();
                     } else if(name.startsWith("get") && !className.equals(owner) && !className.startsWith("sun/reflect") && !className.equals("java/lang/Class")) {
                         maskGetter(GET_ORIGINAL_CONSTRUCTOR, args);

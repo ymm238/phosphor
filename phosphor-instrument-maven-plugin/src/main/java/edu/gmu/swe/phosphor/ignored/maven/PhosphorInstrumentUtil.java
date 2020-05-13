@@ -1,10 +1,10 @@
 package edu.gmu.swe.phosphor.ignored.maven;
 
+import edu.columbia.cs.psl.phosphor.Instrumenter;
+import edu.columbia.cs.psl.phosphor.PhosphorOption;
+import edu.columbia.cs.psl.phosphor.org.apache.commons.cli.Option;
+import edu.columbia.cs.psl.phosphor.org.apache.commons.cli.Options;
 import edu.columbia.cs.psl.phosphor.struct.SinglyLinkedList;
-import edu.columbia.cs.psl.phosphor.instrumenter.Instrumenter;
-import edu.columbia.cs.psl.phosphor.instrumenter.PhosphorOption;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
 import org.codehaus.plexus.util.FileUtils;
 
 import java.io.File;
@@ -83,14 +83,13 @@ public class PhosphorInstrumentUtil {
      */
     public static Map<String, Option> createPhosphorOptionMap(boolean isRuntimeInst) {
         Map<String, Option> phosphorOptionMap = new HashMap<String, Option>();
-//        Options options = PhosphorOption.createOptions(isRuntimeInst);
-//        for(Option option : options.getOptions()) {
-//            phosphorOptionMap.put(option.getOpt(), option);
-//            if(option.hasLongOpt()) {
-//                phosphorOptionMap.put(option.getLongOpt(), option);
-//            }
-//        }
-        //TODO
+        Options options = PhosphorOption.createOptions(isRuntimeInst);
+        for(Option option : options.getOptions()) {
+            phosphorOptionMap.put(option.getOpt(), option);
+            if(option.hasLongOpt()) {
+                phosphorOptionMap.put(option.getLongOpt(), option);
+            }
+        }
         return phosphorOptionMap;
     }
 

@@ -18,8 +18,6 @@ import org.objectweb.asm.util.CheckClassAdapter;
 import org.objectweb.asm.util.TraceClassVisitor;
 
 import java.io.*;
-import java.lang.instrument.IllegalClassFormatException;
-import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Constructor;
 import java.nio.file.Files;
 import java.security.MessageDigest;
@@ -32,28 +30,32 @@ public class PreMain {
     public static boolean INSTRUMENTATION_EXCEPTION_OCCURRED = false;
     public static ClassLoader bigLoader = PreMain.class.getClassLoader();
 
+    public static InstrumentationHelper getInstrumentationHelper() {
+        return instrumentationHelper;
+    }
+
     /**
      * As I write this I realize what a multithreaded classloader mess this can create... let's see how bad it is.
      */
     public static ClassLoader curLoader;
-    private static Instrumentation instrumentation;
+    public static InstrumentationHelper instrumentationHelper;
 
     private PreMain() {
         // Prevents this class from being instantiated
     }
 
-    public static void premain$$PHOSPHORTAGGED(String args, Instrumentation inst, ControlFlowStack ctrl) {
+    public static void premain$$PHOSPHORTAGGED(String args, InstrumentationHelper inst, ControlFlowStack ctrl) {
         Configuration.IMPLICIT_TRACKING = true;
         Configuration.init();
         premain(args, inst);
     }
 
-    public static void premain(String args, Instrumentation inst) {
-        inst.addTransformer(new ClassSupertypeReadingTransformer());
+    public static void premain(String args, InstrumentationHelper instrumentationHelper) {
+        PreMain.instrumentationHelper = instrumentationHelper;
+        PreMain.instrumentationHelper.addTransformer(new ClassSupertypeReadingTransformer());
         RUNTIME_INST = true;
         if(args != null) {
-            throw new UnsupportedOperationException("Args not currently supported");
-//            PhosphorOption.configure(true, parseArgs(args));
+            PhosphorOption.configure(true, parseArgs(args));
         }
         if(System.getProperty("phosphorCacheDirectory") != null) {
             Configuration.CACHE_DIR = System.getProperty("phosphorCacheDirectory");
@@ -71,9 +73,8 @@ public class PreMain {
         }
         // Ensure that BasicSourceSinkManager & anything needed to call isSourceOrSinkOrTaintThrough gets initialized
         BasicSourceSinkManager.getInstance().isSourceOrSinkOrTaintThrough(Object.class);
-        inst.addTransformer(new PCLoggingTransformer());
-        inst.addTransformer(new SourceSinkTransformer(), true);
-        instrumentation = inst;
+        PreMain.instrumentationHelper.addTransformer(new PCLoggingTransformer());
+        PreMain.instrumentationHelper.addTransformer(new SourceSinkTransformer(), true);
     }
 
     private static String[] parseArgs(String argString) {
@@ -93,9 +94,6 @@ public class PreMain {
         return argList.toArray(new String[0]);
     }
 
-    public static Instrumentation getInstrumentation() {
-        return instrumentation;
-    }
 
     public static final class PCLoggingTransformer extends PhosphorBaseTransformer {
         static boolean innerException = false;
@@ -106,8 +104,7 @@ public class PreMain {
         }
 
         @Override
-        public byte[] transform(ClassLoader loader, final String className2, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer)
-                throws IllegalClassFormatException {
+        public byte[] transform(ClassLoader loader, final String className2, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) {
             return _transform(loader, className2, classBeingRedefined, protectionDomain, classfileBuffer);
         }
 
@@ -144,14 +141,13 @@ public class PreMain {
                     if(SerializationFixingCV.isApplicable(className)) {
                         _cv = new SerializationFixingCV(_cv, className);
                     }
-                    //TODO fix initialization order crashes
-//                    _cv = new ClinitRetransformClassVisitor(_cv);
-                    if(isiFace) {
+                    _cv = new ClinitRetransformClassVisitor(_cv);
+                    if (isiFace) {
                         _cv = new TaintTrackingClassVisitor(_cv, skipFrames, fields, nonBridgeMethodsErasedReturnTypes, methodsToReduceSizeOf);
                     } else {
                         _cv = new OurSerialVersionUIDAdder(new TaintTrackingClassVisitor(_cv, skipFrames, fields, nonBridgeMethodsErasedReturnTypes, methodsToReduceSizeOf));
                     }
-                    if(EclipseCompilerCV.isEclipseCompilerClass(className)) {
+                    if (EclipseCompilerCV.isEclipseCompilerClass(className)) {
                         _cv = new EclipseCompilerCV(_cv);
                     }
                     if(OgnlUtilCV.isOgnlUtilClass(className) && !Configuration.REENABLE_CACHES) {

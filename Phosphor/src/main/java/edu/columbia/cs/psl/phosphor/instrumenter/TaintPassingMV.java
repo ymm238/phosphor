@@ -612,9 +612,6 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                     int c = 0;
                     for (int i = 0; i < newArgs.length; i++) {
                         if ((isNEW || needToBoxPrimitiveReturn) && i == newArgs.length - 1) {
-                                /*if NEW, last arg is the return wrapper, doesn't get passed to <init>
-                                similarly, if we need to use a different return wrapper, don't load it
-                                */
                             break;
                         }
                         if (i != locationOfFakeReferenceTaint) { //don't load the taint for a wrapper calling a static method
@@ -680,14 +677,6 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                     ga.returnValue();
                     ga.visitMaxs(0, 0);
                     ga.visitEnd();
-//                    }
-//                    else {
-//                        //No need to add a bridge method, just call the instrumented method directly
-//                        String implMethodInstrumentedDesc = TaintUtils.remapMethodDescAndIncludeReturnHolder(isNEW || isVirtual, implMethod.getDesc());
-//                        String implMethodInstrumentedName = implMethod.getName() + (implMethodInstrumentedDesc.equals(implMethod.getDesc()) ? "" : TaintUtils.METHOD_SUFFIX);
-//
-//                        bsmArgs[1] = new Handle(implMethod.getTag(), implMethod.getOwner(), implMethodInstrumentedName, implMethodInstrumentedDesc, implMethod.isInterface());
-//                    }
                 }
             } else {
                 if(bsmArgs.length > 1 && bsmArgs[1] instanceof Handle) {
