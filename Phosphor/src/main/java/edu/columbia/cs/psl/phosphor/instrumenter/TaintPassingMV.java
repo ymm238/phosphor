@@ -550,8 +550,8 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                 isCalledOnAPrimitiveArrayType = true;
             }
         }
-        if(bsmArgs != null) {
-            if(bsm.getName().equals("metafactory") || bsm.getName().equals("altMetafactory")) {
+        if (bsmArgs != null) {
+            if (bsm.getName().equals("metafactory") || bsm.getName().equals("altMetafactory")) {
                 //This is a lambda
                 Type samMethodType = (Type) bsmArgs[0]; //The method type to be implemented by the function object at runtime
                 Handle implMethod = (Handle) bsmArgs[1]; //The method type to be called. Might have more params than samMethodType, because some args can be captured from the InvokeDynamic
@@ -564,8 +564,8 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                         && !Instrumenter.isIgnoredMethod(implMethod.getOwner(), implMethod.getName(), implMethod.getDesc())
                         && !TaintUtils.remapMethodDescAndIncludeReturnHolder(isVirtual || isNEW, implMethod.getDesc()).equals(implMethod.getDesc())) {
                     //No matter what, we need to remap all of the handles
-                    bsmArgs[0] = Type.getMethodType(TaintUtils.remapMethodDescAndIncludeReturnHolder(!isVirtual, samMethodType.getDescriptor()));
-                    bsmArgs[2] = Type.getMethodType(TaintUtils.remapMethodDescAndIncludeReturnHolder(!isVirtual, instantiatedMethodType.getDescriptor()));
+                    bsmArgs[0] = Type.getMethodType(TaintUtils.remapMethodDescAndIncludeReturnHolder(true, samMethodType.getDescriptor()));
+                    bsmArgs[2] = Type.getMethodType(TaintUtils.remapMethodDescAndIncludeReturnHolder(true, instantiatedMethodType.getDescriptor()));
                     boolean needToAddReturnHolder = samMethodType.getReturnType().getSort() == Type.VOID && Type.getReturnType(implMethod.getDesc()).getSort() != Type.VOID;
                     /*For the implMethodType, we might need to generate a bridge method to:
                         + Add a return holder if the return type is not used by the caller (samMethodType return is void, implMethod return is not void)
@@ -575,122 +575,119 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                      */
 
                     boolean needToBoxPrimitiveReturn = samMethodType.getReturnType().getSort() == Type.OBJECT && TaintUtils.isPrimitiveType(Type.getReturnType(implMethod.getDesc()));
-                    if (isNEW || needToAddReturnHolder || needToBoxPrimitiveReturn || !isVirtual) {
-                        String wrapperImplDesc = implMethod.getDesc();
-                        if (isVirtual) {
-                            //Pass the receiver type as an arg, too, since we are now doing a static bridge method instead of a virtual method
-                            wrapperImplDesc = "(L" + implMethod.getOwner() + ";" + wrapperImplDesc.substring(1);
-                        }
-                        if (needToAddReturnHolder || needToBoxPrimitiveReturn) {
-                            //Need to make the wrapper return a type that the impl method wouldn't return otherwise, and add the return type to desc
-                            //Or, just need to change the type from prim to ref
-                            wrapperImplDesc = Type.getMethodDescriptor(samMethodType.getReturnType(), Type.getArgumentTypes(wrapperImplDesc));
-                        }
-                        if (isNEW) {
-                            //The return type of the wrapper should be a taintedReference
-                            wrapperImplDesc = Type.getMethodDescriptor(Type.getObjectType(implMethod.getOwner()), Type.getArgumentTypes(wrapperImplDesc));
-                        }
-                        int locationOfFakeReferenceTaint = -1;
-                        if (!isVirtual) {
-                            //Add the taint after any parameters that are being statically bound.
-                            locationOfFakeReferenceTaint = Type.getArgumentTypes(desc).length;
-                            wrapperImplDesc = TaintUtils.remapMethodDescAndIncludeReturnHolder(locationOfFakeReferenceTaint, wrapperImplDesc, false);
-                            locationOfFakeReferenceTaint = locationOfFakeReferenceTaint * 2;
-                        } else {
-                            wrapperImplDesc = TaintUtils.remapMethodDescAndIncludeReturnHolder(false, wrapperImplDesc);
-                        }
-                        MethodNode wrapperMethod = new MethodNode(Opcodes.ACC_STATIC | Opcodes.ACC_BRIDGE, "invokeDynamicHelper$" + implMethod.getOwner().replace('/', '$') + "$" + implMethod.getName().replace("<", "").replace(">", "") + wrapperMethodsToAdd.size(), wrapperImplDesc, null, null);
-                        bsmArgs[1] = new Handle(H_INVOKESTATIC, className, wrapperMethod.name, wrapperMethod.desc, false);
-                        wrapperMethodsToAdd.add(wrapperMethod);
-                        GeneratorAdapter ga = new GeneratorAdapter(wrapperMethod, Opcodes.ACC_STATIC, wrapperMethod.name, wrapperMethod.desc);
-                        Type[] newArgs = Type.getArgumentTypes(wrapperMethod.desc);
 
-                        String descOfMethodToCall = TaintUtils.remapMethodDescAndIncludeReturnHolder(isNEW || isVirtual, implMethod.getDesc());
-                        ga.visitCode();
-                        //We load either all args, or all but the return type
-                        if (isNEW) {
-                            ga.visitTypeInsn(NEW, implMethod.getOwner());
-                            ga.visitInsn(DUP);
-                            NEW_EMPTY_TAINT.delegateVisit(ga);
-                        }
-                        int c = 0;
-                        for (int i = 0; i < newArgs.length; i++) {
-                            if ((isNEW || needToBoxPrimitiveReturn) && i == newArgs.length - 1) {
+                    String wrapperImplDesc = implMethod.getDesc();
+                    if (isVirtual) {
+                        //Pass the receiver type as an arg, too, since we are now doing a static bridge method instead of a virtual method
+                        wrapperImplDesc = "(L" + implMethod.getOwner() + ";" + wrapperImplDesc.substring(1);
+                    }
+                    if (needToAddReturnHolder || needToBoxPrimitiveReturn) {
+                        //Need to make the wrapper return a type that the impl method wouldn't return otherwise, and add the return type to desc
+                        //Or, just need to change the type from prim to ref
+                        wrapperImplDesc = Type.getMethodDescriptor(samMethodType.getReturnType(), Type.getArgumentTypes(wrapperImplDesc));
+                    }
+                    if (isNEW) {
+                        //The return type of the wrapper should be a taintedReference
+                        wrapperImplDesc = Type.getMethodDescriptor(Type.getObjectType(implMethod.getOwner()), Type.getArgumentTypes(wrapperImplDesc));
+                    }
+                    int locationOfFakeReferenceTaint = -1;
+                    //Add the taint after any parameters that are being statically bound.
+                    locationOfFakeReferenceTaint = Type.getArgumentTypes(desc).length;
+                    wrapperImplDesc = TaintUtils.remapMethodDescAndIncludeReturnHolder(locationOfFakeReferenceTaint, wrapperImplDesc, false);
+                    locationOfFakeReferenceTaint = locationOfFakeReferenceTaint * 2;
+                    MethodNode wrapperMethod = new MethodNode(Opcodes.ACC_STATIC | Opcodes.ACC_BRIDGE, "invokeDynamicHelper$" + implMethod.getOwner().replace('/', '$') + "$" + implMethod.getName().replace("<", "").replace(">", "") + wrapperMethodsToAdd.size(), wrapperImplDesc, null, null);
+                    bsmArgs[1] = new Handle(H_INVOKESTATIC, className, wrapperMethod.name, wrapperMethod.desc, false);
+                    wrapperMethodsToAdd.add(wrapperMethod);
+                    GeneratorAdapter ga = new GeneratorAdapter(wrapperMethod, Opcodes.ACC_STATIC, wrapperMethod.name, wrapperMethod.desc);
+                    Type[] newArgs = Type.getArgumentTypes(wrapperMethod.desc);
+
+                    String descOfMethodToCall = TaintUtils.remapMethodDescAndIncludeReturnHolder(isNEW || isVirtual, implMethod.getDesc());
+                    ga.visitCode();
+                    //We load either all args, or all but the return type
+                    if (isNEW) {
+                        ga.visitTypeInsn(NEW, implMethod.getOwner());
+                        ga.visitInsn(DUP);
+                        NEW_EMPTY_TAINT.delegateVisit(ga);
+                    }
+                    int c = 0;
+                    for (int i = 0; i < newArgs.length; i++) {
+                        if ((isNEW || needToBoxPrimitiveReturn) && i == newArgs.length - 1) {
                                 /*if NEW, last arg is the return wrapper, doesn't get passed to <init>
                                 similarly, if we need to use a different return wrapper, don't load it
                                 */
-                                break;
-                            }
-                            if(isVirtual || i != locationOfFakeReferenceTaint){ //don't load the taint for a wrapper calling a static method
-                                ga.visitVarInsn(newArgs[i].getOpcode(ILOAD), c);
-                            }
-                            c += newArgs[i].getSize();
+                            break;
                         }
-                        if (isNEW) {
-                            ga.visitMethodInsn(INVOKESPECIAL, implMethod.getOwner(), "<init>", descOfMethodToCall, false);
-                        } else {
-                            int opcodeToCall;
-                            boolean isInterface = false;
-                            switch (implMethod.getTag()) {
-                                case H_INVOKESTATIC:
-                                    opcodeToCall = INVOKESTATIC;
-                                    break;
-                                case H_INVOKEINTERFACE:
-                                    opcodeToCall = INVOKEINTERFACE;
-                                    isInterface = true;
-                                    break;
-                                case H_INVOKESPECIAL:
-                                    opcodeToCall = INVOKESPECIAL;
-                                    break;
-                                case H_INVOKEVIRTUAL:
-                                    opcodeToCall = INVOKEVIRTUAL;
-                                    break;
-                                default:
-                                    throw new UnsupportedOperationException();
-                            }
-                            String nameToCall = implMethod.getName();
-                            if (!implMethod.getDesc().equals(descOfMethodToCall)) {
-                                nameToCall += TaintUtils.METHOD_SUFFIX;
-                            }
-                            if (needToAddReturnHolder || needToBoxPrimitiveReturn) {
-                                //generate a return holder of the right kind
-                                Type wrappedReturnType = Type.getReturnType(descOfMethodToCall);
-                                ga.visitTypeInsn(NEW, wrappedReturnType.getInternalName());
-                                ga.visitInsn(DUP);
-                                ga.visitMethodInsn(INVOKESPECIAL, wrappedReturnType.getInternalName(), "<init>", "()V", false);
-                            }
-                            ga.visitMethodInsn(opcodeToCall, implMethod.getOwner(), nameToCall, descOfMethodToCall, isInterface);
+                        if (i != locationOfFakeReferenceTaint) { //don't load the taint for a wrapper calling a static method
+                            ga.visitVarInsn(newArgs[i].getOpcode(ILOAD), c);
                         }
-                        //Load return value
-                        Type newWrapperReturnType = Type.getReturnType(wrapperMethod.desc);
-                        if (newWrapperReturnType.getSort() != Type.VOID) {
-
-                            if (needToBoxPrimitiveReturn) {
-                                ga.visitVarInsn(ALOAD, c);
-                                ga.visitInsn(SWAP);
-                                ga.visitMethodInsn(INVOKEVIRTUAL, newWrapperReturnType.getInternalName(), "fromPrimitive", "(" + Type.getDescriptor(TaintedPrimitiveWithObjTag.class) + ")V", false);
-                                ga.visitVarInsn(ALOAD, c);
-                            } else if(isNEW){
-                                ga.visitVarInsn(ALOAD, c);
-                                ga.visitInsn(SWAP);
-                                ga.visitFieldInsn(PUTFIELD, newWrapperReturnType.getInternalName(), "val", "Ljava/lang/Object;");
-                                ga.visitVarInsn(ALOAD, c);
-                                ga.visitInsn(DUP);
-                                NEW_EMPTY_TAINT.delegateVisit(ga);
-                                ga.visitFieldInsn(PUTFIELD, newWrapperReturnType.getInternalName(), "taint", Type.getDescriptor(Taint.class));
-                            }
-                            //else... we are a wrapper calling a method and returning type as is
-                        }
-                        ga.returnValue();
-                        ga.visitMaxs(0, 0);
-                        ga.visitEnd();
-                    } else {
-                        //No need to add a bridge method, just call the instrumented method directly
-                        String implMethodInstrumentedDesc = TaintUtils.remapMethodDescAndIncludeReturnHolder(isNEW || isVirtual, implMethod.getDesc());
-                        String implMethodInstrumentedName = implMethod.getName() + (implMethodInstrumentedDesc.equals(implMethod.getDesc()) ? "" : TaintUtils.METHOD_SUFFIX);
-
-                        bsmArgs[1] = new Handle(implMethod.getTag(), implMethod.getOwner(), implMethodInstrumentedName, implMethodInstrumentedDesc, implMethod.isInterface());
+                        c += newArgs[i].getSize();
                     }
+                    if (isNEW) {
+                        ga.visitMethodInsn(INVOKESPECIAL, implMethod.getOwner(), "<init>", descOfMethodToCall, false);
+                    } else {
+                        int opcodeToCall;
+                        boolean isInterface = false;
+                        switch (implMethod.getTag()) {
+                            case H_INVOKESTATIC:
+                                opcodeToCall = INVOKESTATIC;
+                                break;
+                            case H_INVOKEINTERFACE:
+                                opcodeToCall = INVOKEINTERFACE;
+                                isInterface = true;
+                                break;
+                            case H_INVOKESPECIAL:
+                                opcodeToCall = INVOKESPECIAL;
+                                break;
+                            case H_INVOKEVIRTUAL:
+                                opcodeToCall = INVOKEVIRTUAL;
+                                break;
+                            default:
+                                throw new UnsupportedOperationException();
+                        }
+                        String nameToCall = implMethod.getName();
+                        if (!implMethod.getDesc().equals(descOfMethodToCall)) {
+                            nameToCall += TaintUtils.METHOD_SUFFIX;
+                        }
+                        if (needToAddReturnHolder || needToBoxPrimitiveReturn) {
+                            //generate a return holder of the right kind
+                            Type wrappedReturnType = Type.getReturnType(descOfMethodToCall);
+                            ga.visitTypeInsn(NEW, wrappedReturnType.getInternalName());
+                            ga.visitInsn(DUP);
+                            ga.visitMethodInsn(INVOKESPECIAL, wrappedReturnType.getInternalName(), "<init>", "()V", false);
+                        }
+                        ga.visitMethodInsn(opcodeToCall, implMethod.getOwner(), nameToCall, descOfMethodToCall, isInterface);
+                    }
+                    //Load return value
+                    Type newWrapperReturnType = Type.getReturnType(wrapperMethod.desc);
+                    if (newWrapperReturnType.getSort() != Type.VOID) {
+
+                        if (needToBoxPrimitiveReturn) {
+                            ga.visitVarInsn(ALOAD, c);
+                            ga.visitInsn(SWAP);
+                            ga.visitMethodInsn(INVOKEVIRTUAL, newWrapperReturnType.getInternalName(), "fromPrimitive", "(" + Type.getDescriptor(TaintedPrimitiveWithObjTag.class) + ")V", false);
+                            ga.visitVarInsn(ALOAD, c);
+                        } else if (isNEW) {
+                            ga.visitVarInsn(ALOAD, c);
+                            ga.visitInsn(SWAP);
+                            ga.visitFieldInsn(PUTFIELD, newWrapperReturnType.getInternalName(), "val", "Ljava/lang/Object;");
+                            ga.visitVarInsn(ALOAD, c);
+                            ga.visitInsn(DUP);
+                            NEW_EMPTY_TAINT.delegateVisit(ga);
+                            ga.visitFieldInsn(PUTFIELD, newWrapperReturnType.getInternalName(), "taint", Type.getDescriptor(Taint.class));
+                        }
+                        //else... we are a wrapper calling a method and returning type as is
+                    }
+                    ga.returnValue();
+                    ga.visitMaxs(0, 0);
+                    ga.visitEnd();
+//                    }
+//                    else {
+//                        //No need to add a bridge method, just call the instrumented method directly
+//                        String implMethodInstrumentedDesc = TaintUtils.remapMethodDescAndIncludeReturnHolder(isNEW || isVirtual, implMethod.getDesc());
+//                        String implMethodInstrumentedName = implMethod.getName() + (implMethodInstrumentedDesc.equals(implMethod.getDesc()) ? "" : TaintUtils.METHOD_SUFFIX);
+//
+//                        bsmArgs[1] = new Handle(implMethod.getTag(), implMethod.getOwner(), implMethodInstrumentedName, implMethodInstrumentedDesc, implMethod.isInterface());
+//                    }
                 }
             } else {
                 if(bsmArgs.length > 1 && bsmArgs[1] instanceof Handle) {
