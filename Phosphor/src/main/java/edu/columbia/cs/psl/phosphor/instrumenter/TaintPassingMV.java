@@ -564,18 +564,18 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                         && !Instrumenter.isIgnoredMethod(implMethod.getOwner(), implMethod.getName(), implMethod.getDesc())
                         && !TaintUtils.remapMethodDescAndIncludeReturnHolder(isVirtual || isNEW, implMethod.getDesc()).equals(implMethod.getDesc())) {
                     //No matter what, we need to remap all of the handles
-                    bsmArgs[0] = Type.getMethodType(TaintUtils.remapMethodDescAndIncludeReturnHolder(false, samMethodType.getDescriptor()));
-                    bsmArgs[2] = Type.getMethodType(TaintUtils.remapMethodDescAndIncludeReturnHolder(false, instantiatedMethodType.getDescriptor()));
+                    bsmArgs[0] = Type.getMethodType(TaintUtils.remapMethodDescAndIncludeReturnHolder(!isVirtual, samMethodType.getDescriptor()));
+                    bsmArgs[2] = Type.getMethodType(TaintUtils.remapMethodDescAndIncludeReturnHolder(!isVirtual, instantiatedMethodType.getDescriptor()));
                     boolean needToAddReturnHolder = samMethodType.getReturnType().getSort() == Type.VOID && Type.getReturnType(implMethod.getDesc()).getSort() != Type.VOID;
                     /*For the implMethodType, we might need to generate a bridge method to:
                         + Add a return holder if the return type is not used by the caller (samMethodType return is void, implMethod return is not void)
                         + Any newInvokeSpecial - assuming that we are expecting a non-void return
                         + If the implmenetation method returns a primtiive type but SAM has a non-void, we need to handle boxing it
-                        + (TODO - really?) Add a reference taint for "this" if we are calling a non-static method
+                        + Add a reference taint for "this" if we are calling a non-static method
                      */
 
                     boolean needToBoxPrimitiveReturn = samMethodType.getReturnType().getSort() == Type.OBJECT && TaintUtils.isPrimitiveType(Type.getReturnType(implMethod.getDesc()));
-                    if (isNEW || needToAddReturnHolder || needToBoxPrimitiveReturn) {
+                    if (isNEW || needToAddReturnHolder || needToBoxPrimitiveReturn || !isVirtual) {
                         String wrapperImplDesc = implMethod.getDesc();
                         if (isVirtual) {
                             //Pass the receiver type as an arg, too, since we are now doing a static bridge method instead of a virtual method
@@ -590,7 +590,15 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                             //The return type of the wrapper should be a taintedReference
                             wrapperImplDesc = Type.getMethodDescriptor(Type.getObjectType(implMethod.getOwner()), Type.getArgumentTypes(wrapperImplDesc));
                         }
-                        wrapperImplDesc = TaintUtils.remapMethodDescAndIncludeReturnHolder(false, wrapperImplDesc);
+                        int locationOfFakeReferenceTaint = -1;
+                        if (!isVirtual) {
+                            //Add the taint after any parameters that are being statically bound.
+                            locationOfFakeReferenceTaint = Type.getArgumentTypes(desc).length;
+                            wrapperImplDesc = TaintUtils.remapMethodDescAndIncludeReturnHolder(locationOfFakeReferenceTaint, wrapperImplDesc, false);
+                            locationOfFakeReferenceTaint = locationOfFakeReferenceTaint * 2;
+                        } else {
+                            wrapperImplDesc = TaintUtils.remapMethodDescAndIncludeReturnHolder(false, wrapperImplDesc);
+                        }
                         MethodNode wrapperMethod = new MethodNode(Opcodes.ACC_STATIC | Opcodes.ACC_BRIDGE, "invokeDynamicHelper$" + implMethod.getOwner().replace('/', '$') + "$" + implMethod.getName().replace("<", "").replace(">", "") + wrapperMethodsToAdd.size(), wrapperImplDesc, null, null);
                         bsmArgs[1] = new Handle(H_INVOKESTATIC, className, wrapperMethod.name, wrapperMethod.desc, false);
                         wrapperMethodsToAdd.add(wrapperMethod);
@@ -613,7 +621,9 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                                 */
                                 break;
                             }
-                            ga.visitVarInsn(newArgs[i].getOpcode(ILOAD), c);
+                            if(isVirtual || i != locationOfFakeReferenceTaint){ //don't load the taint for a wrapper calling a static method
+                                ga.visitVarInsn(newArgs[i].getOpcode(ILOAD), c);
+                            }
                             c += newArgs[i].getSize();
                         }
                         if (isNEW) {
@@ -647,29 +657,29 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                                 Type wrappedReturnType = Type.getReturnType(descOfMethodToCall);
                                 ga.visitTypeInsn(NEW, wrappedReturnType.getInternalName());
                                 ga.visitInsn(DUP);
-                                ga.visitMethodInsn(INVOKESPECIAL, wrappedReturnType.getInternalName(), "<init>", "()V", isInterface);
+                                ga.visitMethodInsn(INVOKESPECIAL, wrappedReturnType.getInternalName(), "<init>", "()V", false);
                             }
-                            ga.visitMethodInsn(opcodeToCall, implMethod.getOwner(), nameToCall, descOfMethodToCall, false);
+                            ga.visitMethodInsn(opcodeToCall, implMethod.getOwner(), nameToCall, descOfMethodToCall, isInterface);
                         }
                         //Load return value
                         Type newWrapperReturnType = Type.getReturnType(wrapperMethod.desc);
                         if (newWrapperReturnType.getSort() != Type.VOID) {
+
                             if (needToBoxPrimitiveReturn) {
                                 ga.visitVarInsn(ALOAD, c);
                                 ga.visitInsn(SWAP);
-                                ga.visitMethodInsn(INVOKEVIRTUAL, newReturnType.getInternalName(), "fromPrimitive", "(" + Type.getDescriptor(TaintedPrimitiveWithObjTag.class) + ")V", false);
+                                ga.visitMethodInsn(INVOKEVIRTUAL, newWrapperReturnType.getInternalName(), "fromPrimitive", "(" + Type.getDescriptor(TaintedPrimitiveWithObjTag.class) + ")V", false);
                                 ga.visitVarInsn(ALOAD, c);
-                            } else if (!isNEW) {
-                                throw new UnsupportedOperationException();
-                            } else {
+                            } else if(isNEW){
                                 ga.visitVarInsn(ALOAD, c);
                                 ga.visitInsn(SWAP);
-                                ga.visitFieldInsn(PUTFIELD, newReturnType.getInternalName(), "val", "Ljava/lang/Object;");
+                                ga.visitFieldInsn(PUTFIELD, newWrapperReturnType.getInternalName(), "val", "Ljava/lang/Object;");
                                 ga.visitVarInsn(ALOAD, c);
                                 ga.visitInsn(DUP);
                                 NEW_EMPTY_TAINT.delegateVisit(ga);
-                                ga.visitFieldInsn(PUTFIELD, newReturnType.getInternalName(), "taint", Type.getDescriptor(Taint.class));
+                                ga.visitFieldInsn(PUTFIELD, newWrapperReturnType.getInternalName(), "taint", Type.getDescriptor(Taint.class));
                             }
+                            //else... we are a wrapper calling a method and returning type as is
                         }
                         ga.returnValue();
                         ga.visitMaxs(0, 0);

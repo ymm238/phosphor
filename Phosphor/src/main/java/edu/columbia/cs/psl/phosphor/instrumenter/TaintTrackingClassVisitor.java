@@ -287,23 +287,11 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
         }
 
         if(name.contains(TaintUtils.METHOD_SUFFIX) || (desc.contains("phosphor/struct/Tainted") && !name.contains("phosphorWrap"))) {
-            if(isLambda) {
+            if (isLambda) {
                 //lambda wrapper method
-                desc = "(" + Configuration.TAINT_TAG_DESC + desc.substring(1);
                 methodsToAddUnWrappersFor.add(new MethodNode(access, name, desc, signature, exceptions));
-                if((Opcodes.ACC_STATIC & access) == 0) {
-                    //Add taint as first arg.
-                    MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions);
-                    mv = new MethodVisitor(Configuration.ASM_VERSION, mv) {
-                        @Override
-                        public void visitVarInsn(int opcode, int var) {
-                            super.visitVarInsn(opcode, var + (var > 0 ? 1 : 0));
-                        }
-                    };
-                    return mv;
-                } else {
-                    return super.visitMethod(access, name, desc, signature, exceptions);
-                }
+
+                return super.visitMethod(access, name, desc, signature, exceptions);
             }
             //Some dynamic stuff might result in there being weird stuff here
             return new MethodVisitor(Configuration.ASM_VERSION) {

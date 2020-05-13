@@ -296,13 +296,18 @@ public class TaintUtils {
     }
 
     public static String remapMethodDescAndIncludeReturnHolder(boolean isVirtual, String desc, boolean addErasedTypes) {
+        return remapMethodDescAndIncludeReturnHolder(isVirtual ? 0 : -1, desc, addErasedTypes);
+    }
+
+    public static String remapMethodDescAndIncludeReturnHolder(int addTaintAtPos, String desc, boolean addErasedTypes) {
         StringBuilder ret = new StringBuilder();
         ret.append('(');
         StringBuilder wrapped = new StringBuilder();
-        if(isVirtual) {
+        if(addTaintAtPos == 0) {
             ret.append(Configuration.TAINT_TAG_DESC);
         }
         boolean ctrlAdded = !(Configuration.IMPLICIT_TRACKING || Configuration.IMPLICIT_HEADERS_NO_TRACKING);
+        int pos = 0;
         for(Type t : Type.getArgumentTypes(desc)) {
             if(!ctrlAdded && t.getDescriptor().startsWith("Ledu/columbia/cs/psl/phosphor/struct/Tainted")) {
                 ctrlAdded = true;
@@ -317,6 +322,10 @@ public class TaintUtils {
                 wrapped.append(t.getDescriptor());
             }
             if(isShadowedType(t)) {
+                ret.append(Configuration.TAINT_TAG_DESC);
+            }
+            pos++;
+            if(pos == addTaintAtPos && pos > 0){
                 ret.append(Configuration.TAINT_TAG_DESC);
             }
         }
