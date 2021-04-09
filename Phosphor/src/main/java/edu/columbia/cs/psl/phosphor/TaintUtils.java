@@ -6,7 +6,6 @@ import edu.columbia.cs.psl.phosphor.org.objectweb.asm.SignatureReWriter;
 import edu.columbia.cs.psl.phosphor.runtime.ArrayHelper;
 import edu.columbia.cs.psl.phosphor.runtime.Taint;
 import edu.columbia.cs.psl.phosphor.struct.*;
-import edu.columbia.cs.psl.phosphor.struct.harmony.util.ArrayList;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.List;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.StringBuilder;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArray;
@@ -216,6 +215,10 @@ public class TaintUtils {
         return t.getSort() == Type.ARRAY;
     }
 
+    public static boolean isErasedReturnType(Type t){
+        return isWrappedTypeWithErasedType(t) || (t.getSort() == Type.OBJECT && !t.getDescriptor().equals("Ledu/columbia/cs/psl/phosphor/struct/TaintedReferenceWithObjTag;"));
+    }
+
     public static boolean isWrappedTypeWithErasedType(Type t) {
         return t.getSort() == Type.ARRAY && (t.getDimensions() > 1 || t.getElementType().getSort() == Type.OBJECT);
     }
@@ -280,27 +283,31 @@ public class TaintUtils {
                 ret.append(Configuration.TAINT_TAG_DESC);
             }
         }
+        Type returnType = Type.getReturnType(desc);
+        if(isErasedReturnType(returnType)){
+            wrapped.append(returnType.getDescriptor());
+        }
         if(Configuration.IMPLICIT_TRACKING || Configuration.IMPLICIT_HEADERS_NO_TRACKING) {
             ret.append(CONTROL_STACK_DESC);
         }
         ret.append(wrapped);
         ret.append(')');
-        ret.append(getContainerReturnType(Type.getReturnType(desc)).getDescriptor());
+        ret.append(getContainerReturnType(returnType).getDescriptor());
         return ret.toString();
     }
 
     public static String remapMethodDescAndIncludeReturnHolder(boolean isVirtual, String desc) {
-        return remapMethodDescAndIncludeReturnHolder(isVirtual, desc, true);
+        return remapMethodDescAndIncludeReturnHolder(isVirtual, desc, true, true);
     }
 
-    public static String remapMethodDescAndIncludeReturnHolder(boolean isVirtual, String desc, boolean addErasedTypes) {
-        return remapMethodDescAndIncludeReturnHolder(isVirtual ? 0 : -1, desc, addErasedTypes);
+    public static String remapMethodDescAndIncludeReturnHolder(boolean isVirtual, String desc, boolean addErasedReturnType, boolean addErasedParamTypes) {
+        return remapMethodDescAndIncludeReturnHolder(isVirtual ? 0 : -1, desc, addErasedReturnType, addErasedParamTypes);
     }
 
-    public static String remapMethodDescAndIncludeReturnHolder(int addTaintAtPos, String desc, boolean addErasedTypes) {
+    public static String remapMethodDescAndIncludeReturnHolder(int addTaintAtPos, String desc, boolean addErasedReturnType, boolean addErasedParamTypes) {
         StringBuilder ret = new StringBuilder();
         ret.append('(');
-        StringBuilder wrapped = new StringBuilder();
+        StringBuilder erasedTypes = new StringBuilder();
         if(addTaintAtPos == 0) {
             ret.append(Configuration.TAINT_TAG_DESC);
         }
@@ -317,27 +324,36 @@ public class TaintUtils {
                 ret.append(t);
             }
             if(isWrappedTypeWithErasedType(t)) {
-                wrapped.append(t.getDescriptor());
+                erasedTypes.append(t.getDescriptor());
             }
             if(isShadowedType(t)) {
                 ret.append(Configuration.TAINT_TAG_DESC);
             }
             pos++;
             if(pos == addTaintAtPos && pos > 0){
+                if(addErasedParamTypes) {
+                    ret.append(erasedTypes.toString());
+                    erasedTypes = new StringBuilder();
+                }
                 ret.append(Configuration.TAINT_TAG_DESC);
             }
         }
+        Type returnType = Type.getReturnType(desc);
+
         if(!ctrlAdded) {
             ret.append(CONTROL_STACK_DESC);
         }
-        if(Type.getReturnType(desc).getSort() != Type.VOID) {
-            ret.append(getContainerReturnType(Type.getReturnType(desc)).getDescriptor());
+        if (returnType.getSort() != Type.VOID) {
+            ret.append(getContainerReturnType(returnType).getDescriptor());
         }
-        if(addErasedTypes) {
-            ret.append(wrapped);
+        if(addErasedParamTypes) {
+            ret.append(erasedTypes);
+        }
+        if(addErasedReturnType && isErasedReturnType(returnType)){
+            ret.append(returnType.getDescriptor());
         }
         ret.append(')');
-        ret.append(getContainerReturnType(Type.getReturnType(desc)).getDescriptor());
+        ret.append(getContainerReturnType(returnType).getDescriptor());
         return ret.toString();
     }
 
@@ -361,14 +377,18 @@ public class TaintUtils {
                 ret.append(Configuration.TAINT_TAG_DESC);
             }
         }
-        if(Type.getReturnType(desc).getSort() != Type.VOID) {
-            ret.append(getContainerReturnType(Type.getReturnType(desc)).getDescriptor());
+        Type returnType = Type.getReturnType(desc);
+        if(isErasedReturnType(returnType)){
+            wrapped.append(returnType.getDescriptor());
+        }
+        if(returnType.getSort() != Type.VOID) {
+            ret.append(getContainerReturnType(returnType).getDescriptor());
         }
         if(addErasedTypes) {
             ret.append(wrapped);
         }
         ret.append(')');
-        ret.append(getContainerReturnType(Type.getReturnType(desc)).getDescriptor());
+        ret.append(getContainerReturnType(returnType).getDescriptor());
         return ret.toString();
     }
 
@@ -605,13 +625,95 @@ public class TaintUtils {
         }
     }
 
-    public static void main(String[] args) {
-        List<String> lst = new ArrayList<>();
-        System.out.println(remapSignature("(Ljava/util/stream/AbstractPipeline<TP_OUT;TP_OUT;*>;Ljava/util/stream/PipelineHelper<TP_OUT;>;Ljava/util/Spliterator<TP_IN;>;Ljava/util/function/IntFunction<[TP_OUT;>;JJ)V", lst));
-    }
-
     public static boolean containsTaint(String desc) {
         return desc.contains(Configuration.TAINT_TAG_DESC);
     }
 
+    /**
+     * Constructs and returns the bytecode method signature from the specified pieces;
+     * removes any phosphor-added suffixes and tainted types from the signature.
+     */
+    public static String getOriginalMethodSignatureWithoutReturn(String owner, String name, String desc) {
+        if (name.endsWith(METHOD_SUFFIX) || containsTaint(desc)) {
+            return owner + "." + name.replace(METHOD_SUFFIX, "") + getOriginalMethodDescWithoutReturn(desc);
+        } else {
+            return owner + "." + name + desc;
+        }
+    }
+
+    public static String getOriginalMethodDescWithoutReturn(String desc) {
+        StringBuilder builder = new StringBuilder("(");
+        Type[] args = Type.getArgumentTypes(desc);
+        Type returnType = Type.getReturnType(desc);
+        int lastArg = args.length;
+        if (returnType.equals(Type.getType(TaintedReferenceWithObjTag.class))) {
+            lastArg--;
+        }
+        for (int i = 0; i < lastArg; i++) {
+            Type arg = args[i];
+            String argDesc = arg.getDescriptor();
+            if(argDesc.equals(CONTROL_STACK_DESC) || argDesc.equals(Configuration.TAINT_TAG_DESC) ||
+                arg.equals(Type.getType(LazyReferenceArrayObjTags.class)) || isTaintedPrimitiveType(arg) ||
+                arg.equals(Type.getType(TaintedReferenceWithObjTag.class))) {
+                continue;
+            }
+            if (argDesc.startsWith("Ledu/columbia/cs/psl/phosphor/struct/multid")
+                        || argDesc.startsWith("Ledu/columbia/cs/psl/phosphor/struct")) {
+                arg = getUnwrappedType(arg);
+            }
+           builder.append(arg.getDescriptor());
+        }
+        return builder.append(")").toString(); //  + getOriginalMethodReturnTypeDesc(desc);
+    }
+
+    public static String getOriginalMethodReturnTypeDesc(String desc) {
+        Type returnType = Type.getReturnType(desc);
+        if (returnType.getSort() == Type.OBJECT || returnType.getSort() == Type.ARRAY) {
+            if (returnType.getInternalName().equals(Type.getInternalName(TaintedByteWithObjTag.class))) {
+                return "B";
+            } else if (returnType.getDescriptor().contains(Type.getDescriptor(LazyByteArrayObjTags.class))) {
+                return returnType.getDescriptor().replace(Type.getDescriptor(LazyByteArrayObjTags.class),
+                        "[B");
+            } else if (returnType.getInternalName().equals(Type.getInternalName(TaintedBooleanWithObjTag.class))) {
+                return "Z";
+            } else if (returnType.getDescriptor().contains(Type.getDescriptor(LazyBooleanArrayObjTags.class))) {
+                return returnType.getDescriptor().replace(Type.getDescriptor(LazyBooleanArrayObjTags.class),
+                        "[Z");
+            } else if (returnType.getInternalName().equals(Type.getInternalName(TaintedCharWithObjTag.class))) {
+                return "C";
+            } else if (returnType.getDescriptor().contains(Type.getDescriptor(LazyCharArrayObjTags.class))) {
+                return returnType.getDescriptor().replace(Type.getDescriptor(LazyCharArrayObjTags.class),
+                        "[C");
+            } else if (returnType.getInternalName().equals(Type.getInternalName(TaintedDoubleWithObjTag.class))) {
+                return "D";
+            } else if (returnType.getDescriptor().contains(Type.getDescriptor(LazyDoubleArrayObjTags.class))) {
+                return returnType.getDescriptor().replace(Type.getDescriptor(LazyDoubleArrayObjTags.class),
+                        "[D");
+            } else if (returnType.getInternalName().equals(Type.getInternalName(TaintedIntWithObjTag.class))) {
+                return "I";
+            } else if (returnType.getDescriptor().contains(Type.getDescriptor(LazyIntArrayObjTags.class))) {
+                return returnType.getDescriptor().replace(Type.getDescriptor(LazyIntArrayObjTags.class),
+                        "[I");
+            } else if (returnType.getInternalName().equals(Type.getInternalName(TaintedFloatWithObjTag.class))) {
+                return "F";
+            } else if (returnType.getDescriptor().contains(Type.getDescriptor(LazyFloatArrayObjTags.class))) {
+                return returnType.getDescriptor().replace(Type.getDescriptor(LazyFloatArrayObjTags.class),
+                        "[F");
+            } else if (returnType.getInternalName().equals(Type.getInternalName(TaintedLongWithObjTag.class))) {
+                return "J";
+            } else if (returnType.getDescriptor().contains(Type.getDescriptor(LazyLongArrayObjTags.class))) {
+                return returnType.getDescriptor().replace(Type.getDescriptor(LazyLongArrayObjTags.class),
+                        "[J");
+            } else if (returnType.getInternalName().equals(Type.getInternalName(TaintedShortWithObjTag.class))) {
+                return "S";
+            } else if (returnType.getDescriptor().contains(Type.getDescriptor(LazyShortArrayObjTags.class))) {
+                return returnType.getDescriptor().replace(Type.getDescriptor(LazyShortArrayObjTags.class),
+                        "[S");
+            } else if (returnType.getDescriptor().equals(Type.getDescriptor(TaintedReferenceWithObjTag.class))) {
+                Type[] args = Type.getArgumentTypes(desc);
+                return args[args.length - 1].getDescriptor();
+            }
+        }
+        return returnType.getDescriptor();
+    }
 }

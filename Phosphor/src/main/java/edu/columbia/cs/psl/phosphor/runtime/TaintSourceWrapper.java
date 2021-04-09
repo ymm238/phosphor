@@ -1,12 +1,15 @@
 package edu.columbia.cs.psl.phosphor.runtime;
 
 import edu.columbia.cs.psl.phosphor.Configuration;
+import edu.columbia.cs.psl.phosphor.instrumenter.InvokedViaInstrumentation;
 import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREFieldHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.HashSet;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.Set;
 
 import java.lang.reflect.Array;
+
+import static edu.columbia.cs.psl.phosphor.instrumenter.TaintMethodRecord.AUTO_TAINT;
 
 /**
  * This class handles dynamically doing source-based tainting.
@@ -102,7 +105,7 @@ public class TaintSourceWrapper<T extends AutoTaintLabel> {
     }
 
     /* Called by sources for the arguments and return value. */
-    @SuppressWarnings("unused")
+    @InvokedViaInstrumentation(record = AUTO_TAINT)
     public Object autoTaint(Object obj, String baseSource, String actualSource, int argIdx) {
         return autoTaint(obj, generateTaint(baseSource));
     }
@@ -278,6 +281,7 @@ public class TaintSourceWrapper<T extends AutoTaintLabel> {
     }
 
     public static Taint[] getStringValueTaints(String str) {
-        return getStringValueTag(str).taints;
+        LazyArrayObjTags tag = getStringValueTag(str);
+        return tag == null? null : tag.taints;
     }
 }

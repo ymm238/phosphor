@@ -137,7 +137,7 @@
                                     <property name="phosphor.jar" value="${maven.dependency.edu.gmu.swe.phosphor.Phosphor.jar.path}"/>
                                     <property name="phosphor-javaagent.jar" value="${maven.dependency.edu.gmu.swe.phosphor.phosphor-javaagent.jar.path}"/>
                                     <property name="argLine.prefix"
-                                              value="-Dphosphor.verify=true -javaagent:${phosphor-javaagent.jar}=${auto.taint} -XX:+TraceExceptions"/>
+                                              value="-Dphosphor.verify=true -javaagent:${phosphor-javaagent.jar}=${auto.taint} -XX:+TraceExceptions "/>
                                 </target>
                             </configuration>
                         </execution>

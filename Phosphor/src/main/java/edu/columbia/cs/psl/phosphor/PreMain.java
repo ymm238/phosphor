@@ -3,7 +3,6 @@ package edu.columbia.cs.psl.phosphor;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
 import edu.columbia.cs.psl.phosphor.instrumenter.*;
 import edu.columbia.cs.psl.phosphor.instrumenter.asm.OffsetPreservingClassReader;
-import edu.columbia.cs.psl.phosphor.org.objectweb.asm.commons.OurJSRInlinerAdapter;
 import edu.columbia.cs.psl.phosphor.org.objectweb.asm.commons.OurSerialVersionUIDAdder;
 import edu.columbia.cs.psl.phosphor.runtime.TaintInstrumented;
 import edu.columbia.cs.psl.phosphor.struct.SinglyLinkedList;
@@ -13,14 +12,15 @@ import edu.columbia.cs.psl.phosphor.struct.harmony.util.LinkedList;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.List;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.Set;
 import org.objectweb.asm.*;
-import org.objectweb.asm.tree.*;
+import org.objectweb.asm.tree.AnnotationNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
+import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.util.CheckClassAdapter;
 import org.objectweb.asm.util.TraceClassVisitor;
 
 import java.io.*;
 import java.lang.reflect.Constructor;
-import java.nio.file.Files;
-import java.security.MessageDigest;
 import java.security.ProtectionDomain;
 
 public class PreMain {
@@ -30,15 +30,11 @@ public class PreMain {
     public static boolean INSTRUMENTATION_EXCEPTION_OCCURRED = false;
     public static ClassLoader bigLoader = PreMain.class.getClassLoader();
 
-    public static InstrumentationHelper getInstrumentationHelper() {
-        return instrumentationHelper;
-    }
-
     /**
-     * As I write this I realize what a multithreaded classloader mess this can create... let's see how bad it is.
+     * As I write this I realize what a multi-threaded classloader mess this can create... let's see how bad it is.
      */
     public static ClassLoader curLoader;
-    public static InstrumentationHelper instrumentationHelper;
+    private static InstrumentationHelper instrumentationHelper;
 
     private PreMain() {
         // Prevents this class from being instantiated
@@ -52,29 +48,21 @@ public class PreMain {
 
     public static void premain(String args, InstrumentationHelper instrumentationHelper) {
         PreMain.instrumentationHelper = instrumentationHelper;
-        PreMain.instrumentationHelper.addTransformer(new ClassSupertypeReadingTransformer());
+        instrumentationHelper.addTransformer(new ClassSupertypeReadingTransformer());
         RUNTIME_INST = true;
         if(args != null) {
             PhosphorOption.configure(true, parseArgs(args));
         }
         if(System.getProperty("phosphorCacheDirectory") != null) {
-            Configuration.CACHE_DIR = System.getProperty("phosphorCacheDirectory");
-            File f = new File(Configuration.CACHE_DIR);
-            if(!f.exists()) {
-                if(!f.mkdir()) {
-                    // The cache directory did not exist and the attempt to create it failed
-                    System.err.printf("Failed to create cache directory: %s. Generated files are not being cached.\n", Configuration.CACHE_DIR);
-                    Configuration.CACHE_DIR = null;
-                }
-            }
+            Configuration.CACHE = TransformationCache.getInstance(System.getProperty("phosphorCacheDirectory"));
         }
         if(Instrumenter.loader == null) {
             Instrumenter.loader = bigLoader;
         }
         // Ensure that BasicSourceSinkManager & anything needed to call isSourceOrSinkOrTaintThrough gets initialized
         BasicSourceSinkManager.getInstance().isSourceOrSinkOrTaintThrough(Object.class);
-        PreMain.instrumentationHelper.addTransformer(new PCLoggingTransformer());
-        PreMain.instrumentationHelper.addTransformer(new SourceSinkTransformer(), true);
+        instrumentationHelper.addTransformer(new PCLoggingTransformer());
+        instrumentationHelper.addTransformer(new SourceSinkTransformer(), true);
     }
 
     private static String[] parseArgs(String argString) {
@@ -94,37 +82,145 @@ public class PreMain {
         return argList.toArray(new String[0]);
     }
 
+    public static InstrumentationHelper getInstrumentationHelper() {
+        return instrumentationHelper;
+    }
 
     public static final class PCLoggingTransformer extends PhosphorBaseTransformer {
-        static boolean innerException = false;
-        static MessageDigest md5inst;
 
         public PCLoggingTransformer() {
             TaintUtils.VERIFY_CLASS_GENERATION = System.getProperty("phosphor.verify") != null;
         }
 
         @Override
-        public byte[] transform(ClassLoader loader, final String className2, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) {
-            return _transform(loader, className2, classBeingRedefined, protectionDomain, classfileBuffer);
+        public byte[] transform(ClassLoader loader, final String className2, Class<?> classBeingRedefined,
+                                ProtectionDomain protectionDomain, byte[] classfileBuffer) {
+            ClassReader cr = (Configuration.READ_AND_SAVE_BCI ? new OffsetPreservingClassReader(classfileBuffer)
+                    : new ClassReader(classfileBuffer));
+            String className = cr.getClassName();
+            curLoader = loader;
+            if (Instrumenter.isIgnoredClass(className)) {
+                switch (className) {
+                    case "java/lang/Boolean":
+                    case "java/lang/Byte":
+                    case "java/lang/Character":
+                    case "java/lang/Short":
+                        return processBoolean(classfileBuffer);
+                }
+                return classfileBuffer;
+            }
+            Configuration.taintTagFactory.instrumentationStarting(className);
+            try {
+                ClassNode cn = new ClassNode();
+                cr.accept(cn, ClassReader.SKIP_CODE);
+                boolean upgradeVersion = false;
+                if (className.equals("org/jruby/parser/Ruby20YyTables")) {
+                    cn.version = 51;
+                    upgradeVersion = true;
+                }
+                if (cn.visibleAnnotations != null) {
+                    for (Object o : cn.visibleAnnotations) {
+                        AnnotationNode an = (AnnotationNode) o;
+                        if (an.desc.equals(Type.getDescriptor(TaintInstrumented.class))) {
+                            return classfileBuffer;
+                        }
+                    }
+                }
+                if (cn.interfaces != null) {
+                    for (Object s : cn.interfaces) {
+                        if (s.equals(Type.getInternalName(TaintedWithObjTag.class))) {
+                            return classfileBuffer;
+                        }
+                    }
+                }
+                for (Object mn : cn.methods) {
+                    if (((MethodNode) mn).name.equals("getPHOSPHOR_TAG")) {
+                        return classfileBuffer;
+                    }
+                }
+                if (Configuration.CACHE != null) {
+                    byte[] cachedClass = Configuration.CACHE.load(className, classfileBuffer);
+                    if (cachedClass != null) {
+                        return cachedClass;
+                    }
+                }
+                if (DEBUG) {
+                    try {
+                        File debugDir = new File("debug-preinst");
+                        if (!debugDir.exists()) {
+                            debugDir.mkdir();
+                        }
+                        File f = new File("debug-preinst/" + className.replace("/", ".") + ".class");
+                        FileOutputStream fos = new FileOutputStream(f);
+                        fos.write(classfileBuffer);
+                        fos.close();
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+                boolean isiFace = (cn.access & Opcodes.ACC_INTERFACE) != 0;
+                List<FieldNode> fields = new LinkedList<>();
+                for (FieldNode node : cn.fields) {
+                    fields.add(node);
+                }
+                boolean skipFrames = LegacyClassFixer.shouldFixFrames(cn, className, cr);
+                if (skipFrames) {
+                    // This class is old enough to not guarantee frames.
+                    // Generate new frames for analysis reasons, then make sure to not emit ANY frames.
+                    cr = LegacyClassFixer.fix(cr);
+                }
+                try {
+                    byte[] instrumentedBytes = instrumentWithRetry(cr, classfileBuffer, isiFace, className, skipFrames,
+                            upgradeVersion, fields, null, false);
+                    if (DEBUG) {
+                        File f = new File("debug/" + className + ".class");
+                        f.getParentFile().mkdirs();
+                        FileOutputStream fos = new FileOutputStream(f);
+                        fos.write(instrumentedBytes);
+                        fos.close();
+                    }
+                    if (Configuration.CACHE != null) {
+                        Configuration.CACHE.store(className, classfileBuffer, instrumentedBytes);
+                    }
+                    return instrumentedBytes;
+                } catch (Throwable ex) {
+                    ex.printStackTrace();
+                    throw new IllegalStateException(ex);
+                }
+            } finally {
+                Configuration.taintTagFactory.instrumentationEnding(className);
+            }
         }
 
-        static byte[] instrumentWithRetry(ClassReader cr, byte[] classFileBuffer, boolean isiFace, String className, boolean skipFrames, boolean upgradeVersion, List<FieldNode> fields, Set<String> nonBridgeMethodsErasedReturnTypes, Set<String> methodsToReduceSizeOf, boolean traceClass) throws InstantiationException {
+        static byte[] instrumentWithRetry(ClassReader cr, byte[] classFileBuffer, boolean isiFace, String className,
+                                          boolean skipFrames, boolean upgradeVersion, List<FieldNode> fields,
+                                          Set<String> methodsToReduceSizeOf, boolean traceClass) {
             TraceClassVisitor debugTracer = null;
             try {
                 try {
                     ClassWriter cw = new HackyClassWriter(null, ClassWriter.COMPUTE_MAXS);
-                    ClassVisitor _cv = cw;
+                    ClassVisitor _cv = new ClassVisitor(Opcodes.ASM7, cw) {
+                        @Override
+                        public MethodVisitor visitMethod(int access, String name, String descriptor, String signature,
+                                                         String[] exceptions) {
+                            if (name.endsWith("$PHOSPHORTAGGED$$PHOSPHORTAGGED")) {
+                                throw new IllegalArgumentException();
+                            }
+                            return super.visitMethod(access, name, descriptor, signature, exceptions);
+                        }
+                    };
                     if(traceClass) {
                         System.out.println("Saving " + className + " to debug-preinst/");
-                        File f = new File("debug-preinst/" + className.replace("/", ".") + ".class");
-                        if(!f.getParentFile().isDirectory() && !f.getParentFile().mkdirs()) {
+                        File f = new File("debug-preinst/" + className.replace("/", ".") +
+                                ".class");
+                        if (!f.getParentFile().isDirectory() && !f.getParentFile().mkdirs()) {
                             System.err.println("Failed to make debug directory: " + f);
                         } else {
                             try {
                                 FileOutputStream fos = new FileOutputStream(f);
                                 fos.write(classFileBuffer);
                                 fos.close();
-                            } catch(Exception ex2) {
+                            } catch (Exception ex2) {
                                 ex2.printStackTrace();
                             }
                         }
@@ -142,12 +238,13 @@ public class PreMain {
                         _cv = new SerializationFixingCV(_cv, className);
                     }
                     _cv = new ClinitRetransformClassVisitor(_cv);
-                    if (isiFace) {
-                        _cv = new TaintTrackingClassVisitor(_cv, skipFrames, fields, nonBridgeMethodsErasedReturnTypes, methodsToReduceSizeOf);
+                    if(isiFace) {
+                        _cv = new TaintTrackingClassVisitor(_cv, skipFrames, fields, methodsToReduceSizeOf);
                     } else {
-                        _cv = new OurSerialVersionUIDAdder(new TaintTrackingClassVisitor(_cv, skipFrames, fields, nonBridgeMethodsErasedReturnTypes, methodsToReduceSizeOf));
+                        _cv = new OurSerialVersionUIDAdder(new TaintTrackingClassVisitor(_cv, skipFrames, fields,
+                                methodsToReduceSizeOf));
                     }
-                    if (EclipseCompilerCV.isEclipseCompilerClass(className)) {
+                    if(EclipseCompilerCV.isEclipseCompilerClass(className)) {
                         _cv = new EclipseCompilerCV(_cv);
                     }
                     if(OgnlUtilCV.isOgnlUtilClass(className) && !Configuration.REENABLE_CACHES) {
@@ -171,7 +268,6 @@ public class PreMain {
                     cr.accept(_cv, ClassReader.EXPAND_FRAMES);
                     byte[] instrumentedBytes = cw.toByteArray();
                     if (!traceClass && (DEBUG || TaintUtils.VERIFY_CLASS_GENERATION)) {
-
                         ClassReader cr2 = new ClassReader(instrumentedBytes);
                         try {
                             cr2.accept(new CheckClassAdapter(new ClassWriter(0), true), ClassReader.EXPAND_FRAMES);
@@ -192,21 +288,20 @@ public class PreMain {
                             }
                         }
                     }
-
                     return instrumentedBytes;
                 } catch(MethodTooLargeException ex) {
                     if(methodsToReduceSizeOf == null) {
                         methodsToReduceSizeOf = new HashSet<>();
                     }
                     methodsToReduceSizeOf.add(ex.getMethodName() + ex.getDescriptor());
-                    return instrumentWithRetry(cr, classFileBuffer, isiFace, className, skipFrames, upgradeVersion, fields, nonBridgeMethodsErasedReturnTypes, methodsToReduceSizeOf, false);
+                    return instrumentWithRetry(cr, classFileBuffer, isiFace, className, skipFrames, upgradeVersion, fields,  methodsToReduceSizeOf, false);
                 }
             } catch (Throwable ex) {
                 INSTRUMENTATION_EXCEPTION_OCCURRED = true;
                 if (!traceClass) {
                     System.err.println("Exception occurred while instrumenting " + className + ":");
                     ex.printStackTrace();
-                    instrumentWithRetry(cr, classFileBuffer, isiFace, className, skipFrames, upgradeVersion, fields, nonBridgeMethodsErasedReturnTypes, methodsToReduceSizeOf, true);
+                    instrumentWithRetry(cr, classFileBuffer, isiFace, className, skipFrames, upgradeVersion, fields,  methodsToReduceSizeOf, true);
                     return classFileBuffer;
                 }
                 ex.printStackTrace();
@@ -219,198 +314,6 @@ public class PreMain {
                     ex2.printStackTrace();
                 }
                 return classFileBuffer;
-            }
-        }
-
-        public static byte[] _transform(ClassLoader loader, final String className2, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) {
-            ClassReader cr = (Configuration.READ_AND_SAVE_BCI ? new OffsetPreservingClassReader(classfileBuffer) : new ClassReader(classfileBuffer));
-            String className = cr.getClassName();
-            curLoader = loader;
-            if(Instrumenter.isIgnoredClass(className)) {
-                switch(className) {
-                    case "java/lang/Boolean":
-                    case "java/lang/Byte":
-                    case "java/lang/Character":
-                    case "java/lang/Short":
-                        return processBoolean(classfileBuffer);
-                }
-                return classfileBuffer;
-            }
-
-            Configuration.taintTagFactory.instrumentationStarting(className);
-            try {
-                ClassNode cn = new ClassNode();
-                cr.accept(cn, (Configuration.ALWAYS_CHECK_FOR_FRAMES ? 0 : ClassReader.SKIP_CODE));
-                boolean skipFrames = false;
-                boolean upgradeVersion = false;
-                if(className.equals("org/jruby/parser/Ruby20YyTables")) {
-                    cn.version = 51;
-                    upgradeVersion = true;
-                }
-                if(cn.version >= 100 || cn.version <= 50 || className.endsWith("$Access4JacksonSerializer") || className.endsWith("$Access4JacksonDeSerializer")) {
-                    skipFrames = true;
-                } else if(Configuration.ALWAYS_CHECK_FOR_FRAMES) {
-                    for(MethodNode mn : cn.methods) {
-                        boolean hasJumps = false;
-                        boolean foundFrame = false;
-                        AbstractInsnNode ins = mn.instructions.getFirst();
-                        if(!mn.tryCatchBlocks.isEmpty()) {
-                            hasJumps = true;
-                        }
-                        while(ins != null) {
-                            if(ins instanceof JumpInsnNode || ins instanceof TableSwitchInsnNode || ins instanceof LookupSwitchInsnNode) {
-                                hasJumps = true;
-                            }
-                            if(ins instanceof FrameNode) {
-                                foundFrame = true;
-                                break;
-                            }
-                            ins = ins.getNext();
-                        }
-                        if(foundFrame) {
-                            break;
-                        }
-                        if(hasJumps) {
-                            skipFrames = true;
-                            break;
-                        }
-                    }
-                }
-                if(cn.visibleAnnotations != null) {
-                    for(Object o : cn.visibleAnnotations) {
-                        AnnotationNode an = (AnnotationNode) o;
-                        if(an.desc.equals(Type.getDescriptor(TaintInstrumented.class))) {
-                            return classfileBuffer;
-                        }
-                    }
-                }
-                if(cn.interfaces != null) {
-                    for(Object s : cn.interfaces) {
-                        if(s.equals(Type.getInternalName(TaintedWithObjTag.class))) {
-                            return classfileBuffer;
-                        }
-                    }
-                }
-                for(Object mn : cn.methods) {
-                    if(((MethodNode) mn).name.equals("getPHOSPHOR_TAG")) {
-                        return classfileBuffer;
-                    }
-                }
-                if(Configuration.CACHE_DIR != null) {
-                    String cacheKey = className.replace("/", ".");
-                    File f = new File(Configuration.CACHE_DIR + File.separator + cacheKey + ".md5sum");
-                    if(f.exists()) {
-                        try {
-                            FileInputStream fis = new FileInputStream(f);
-                            byte[] cachedDigest = new byte[1024];
-                            fis.read(cachedDigest);
-                            fis.close();
-                            if(md5inst == null) {
-                                md5inst = MessageDigest.getInstance("MD5");
-                            }
-                            byte[] checksum;
-                            synchronized(md5inst) {
-                                checksum = md5inst.digest(classfileBuffer);
-                            }
-                            boolean matches = true;
-                            if(checksum.length > cachedDigest.length) {
-                                matches = false;
-                            }
-                            if(matches) {
-                                for(int i = 0; i < checksum.length; i++) {
-                                    if(checksum[i] != cachedDigest[i]) {
-                                        matches = false;
-                                        break;
-                                    }
-                                }
-                            }
-                            if(matches) {
-                                return Files.readAllBytes(new File(Configuration.CACHE_DIR + File.separator + cacheKey + ".class").toPath());
-                            }
-                        } catch(Throwable t) {
-                            t.printStackTrace();
-                        }
-                    }
-                }
-                if(DEBUG) {
-                    try {
-                        File debugDir = new File("debug-preinst");
-                        if(!debugDir.exists()) {
-                            debugDir.mkdir();
-                        }
-                        File f = new File("debug-preinst/" + className.replace("/", ".") + ".class");
-                        FileOutputStream fos = new FileOutputStream(f);
-                        fos.write(classfileBuffer);
-                        fos.close();
-                    } catch(IOException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-
-                boolean isiFace = (cn.access & Opcodes.ACC_INTERFACE) != 0;
-                List<FieldNode> fields = new LinkedList<>();
-                for(FieldNode node : cn.fields) {
-                    fields.add(node);
-                }
-                Set<String> nonBridgeMethodsErasedReturnTypes = new HashSet<>();
-                for(MethodNode mn : cn.methods) {
-                    if((mn.access & Opcodes.ACC_BRIDGE) == 0) {
-                        nonBridgeMethodsErasedReturnTypes.add(mn.name + "." + mn.desc.substring(0, mn.desc.indexOf(')')));
-                    }
-                }
-                if(skipFrames) {
-                    // This class is old enough to not guarantee frames.
-                    // Generate new frames for analysis reasons, then make sure
-                    // to not emit ANY frames.
-                    ClassWriter cw = new HackyClassWriter(cr, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-                    cr.accept(new ClassVisitor(Configuration.ASM_VERSION, cw) {
-                        @Override
-                        public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
-                            return new OurJSRInlinerAdapter(super.visitMethod(access, name, desc, signature, exceptions), access, name, desc, signature, exceptions);
-                        }
-                    }, 0);
-                    cr = (Configuration.READ_AND_SAVE_BCI ? new OffsetPreservingClassReader(cw.toByteArray()) : new ClassReader(cw.toByteArray()));
-                }
-                // Find out if this class already has frames
-                TraceClassVisitor cv;
-                try {
-                    byte[] instrumentedBytes = instrumentWithRetry(cr, classfileBuffer, isiFace, className, skipFrames, upgradeVersion, fields, nonBridgeMethodsErasedReturnTypes, null, false);
-
-                    if(DEBUG) {
-                        File f = new File("debug/" + className + ".class");
-                        f.getParentFile().mkdirs();
-                        FileOutputStream fos = new FileOutputStream(f);
-                        fos.write(instrumentedBytes);
-                        fos.close();
-                    }
-
-                    if(Configuration.CACHE_DIR != null) {
-                        String cacheKey = className.replace("/", ".");
-                        File f = new File(Configuration.CACHE_DIR + File.separator + cacheKey + ".class");
-                        FileOutputStream fos = new FileOutputStream(f);
-                        fos.write(instrumentedBytes);
-                        fos.close();
-                        if(md5inst == null) {
-                            md5inst = MessageDigest.getInstance("MD5");
-                        }
-                        byte[] checksum;
-                        synchronized(md5inst) {
-                            checksum = md5inst.digest(classfileBuffer);
-                        }
-                        f = new File(Configuration.CACHE_DIR + File.separator + cacheKey + ".md5sum");
-                        fos = new FileOutputStream(f);
-
-                        fos.write(checksum);
-                        fos.close();
-                        return instrumentedBytes;
-                    }
-                    return instrumentedBytes;
-                } catch(Throwable ex) {
-                    ex.printStackTrace();
-                    throw new IllegalStateException(ex);
-                }
-            } finally {
-                Configuration.taintTagFactory.instrumentationEnding(className);
             }
         }
 
@@ -428,7 +331,9 @@ public class PreMain {
             }
             for(Object o : cn.methods) {
                 MethodNode mn = (MethodNode) o;
-                if(mn.name.startsWith("toUpperCase") || mn.name.startsWith("codePointAtImpl") || mn.name.startsWith("codePointBeforeImpl")) {
+                if (mn.name.startsWith("toUpperCase")
+                        || mn.name.startsWith("codePointAtImpl")
+                        || mn.name.startsWith("codePointBeforeImpl")) {
                     mn.access = mn.access | Opcodes.ACC_PUBLIC;
                 }
             }
@@ -439,50 +344,6 @@ public class PreMain {
                 return cw.toByteArray();
             }
             return classFileBuffer;
-        }
-
-        private static final class HackyClassWriter extends ClassWriter {
-
-            private HackyClassWriter(ClassReader classReader, int flags) {
-                super(classReader, flags);
-            }
-
-            private Class<?> getClass(String name) throws ClassNotFoundException {
-                if(RUNTIME_INST) {
-                    throw new ClassNotFoundException();
-                }
-                try {
-                    return Class.forName(name.replace("/", "."), false, bigLoader);
-                } catch(SecurityException e) {
-                    throw new ClassNotFoundException("Security exception when loading class");
-                } catch(Throwable e) {
-                    throw new ClassNotFoundException();
-                }
-            }
-
-            protected String getCommonSuperClass(String type1, String type2) {
-                Class<?> c, d;
-                try {
-                    c = getClass(type1);
-                    d = getClass(type2);
-                } catch(ClassNotFoundException | ClassCircularityError e) {
-                    return "java/lang/Object";
-                }
-                if(c.isAssignableFrom(d)) {
-                    return type1;
-                }
-                if(d.isAssignableFrom(c)) {
-                    return type2;
-                }
-                if(c.isInterface() || d.isInterface()) {
-                    return "java/lang/Object";
-                } else {
-                    do {
-                        c = c.getSuperclass();
-                    } while(!c.isAssignableFrom(d));
-                    return c.getName().replace('.', '/');
-                }
-            }
         }
     }
 }

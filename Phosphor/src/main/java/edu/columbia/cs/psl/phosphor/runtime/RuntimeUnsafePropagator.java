@@ -569,7 +569,7 @@ public class RuntimeUnsafePropagator {
         }
     }
 
-    public static TaintedReferenceWithObjTag getObject$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, TaintedReferenceWithObjTag ret) {
+    public static TaintedReferenceWithObjTag getObject$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, TaintedReferenceWithObjTag ret, Object e) {
         if(obj instanceof LazyReferenceArrayObjTags) {
             ((LazyReferenceArrayObjTags) obj).get(((LazyReferenceArrayObjTags) obj).unsafeIndexFor(unsafe, offset), ret);
         } else {
@@ -584,7 +584,7 @@ public class RuntimeUnsafePropagator {
         return ret;
     }
 
-    public static TaintedReferenceWithObjTag getObjectVolatile$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, TaintedReferenceWithObjTag ret) {
+    public static TaintedReferenceWithObjTag getObjectVolatile$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, TaintedReferenceWithObjTag ret, Object e) {
         if(obj instanceof LazyReferenceArrayObjTags) {
             ((LazyReferenceArrayObjTags) obj).get(((LazyReferenceArrayObjTags) obj).unsafeIndexFor(unsafe, offset), ret);
         } else {

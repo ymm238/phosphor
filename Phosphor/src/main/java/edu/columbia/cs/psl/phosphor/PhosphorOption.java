@@ -7,7 +7,6 @@ import edu.columbia.cs.psl.phosphor.runtime.TaintSourceWrapper;
 import org.apache.commons.cli.*;
 import org.objectweb.asm.ClassVisitor;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.EnumMap;
@@ -144,7 +143,9 @@ public enum PhosphorOption {
         }
     },
     CONTROL_FLOW_MANAGER(new PhosphorOptionBuilder("Can be used to specify the name of a class to be used as the ControlFlowManager " +
-            "during instrumentation. This class must implement ControlFlowManager.", true, true)
+            "during instrumentation. This class must implement ControlFlowManager." +
+            "The package containing the ControlFlowManager class will be ignored by Phosphor (i.e., not instrumented with taint tracking logic).",
+            true, true)
             .argType(Class.class)
             .group(PhosphorOptionGroup.CONTROL_PROPAGATION)) {
         @Override
@@ -154,6 +155,7 @@ public enum PhosphorOption {
                     @SuppressWarnings("unchecked")
                     Class<? extends ControlFlowManager> clazz = (Class<? extends ControlFlowManager>) commandLine.getParsedOptionValue(optionName);
                     if(clazz != null) {
+                        Configuration.controlFlowManagerPackage = clazz.getPackage().getName().replace('.', '/');
                         Configuration.controlFlowManager = clazz.newInstance();
                         Configuration.IMPLICIT_TRACKING = true;
                     }
@@ -169,19 +171,8 @@ public enum PhosphorOption {
             .argType(String.class)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(isPresent) {
-                Configuration.CACHE_DIR = commandLine.getOptionValue(optionName);
-                File f = new File(Configuration.CACHE_DIR);
-                if(!f.exists()) {
-                    if(!f.mkdir()) {
-                        // The cache directory did not exist and the attempt to create it failed
-                        System.err.printf("Failed to create cache directory: %s. Generated files are not being cached.\n", Configuration.CACHE_DIR);
-                        Configuration.CACHE_DIR = null;
-                    }
-                }
-            } else {
-                Configuration.CACHE_DIR = null;
-            }
+            Configuration.CACHE = isPresent ? TransformationCache.getInstance(commandLine.getOptionValue(optionName)) :
+                    null;
         }
     },
     WITH_HEAVY_OBJ_EQUALS_HASHCODE(new PhosphorOptionBuilder(null, true, true).alternativeName("objmethods")) {
@@ -255,6 +246,8 @@ public enum PhosphorOption {
                     @SuppressWarnings("unchecked")
                     Class<? extends TaintTagFactory> clazz = (Class<? extends TaintTagFactory>) commandLine.getParsedOptionValue(optionName);
                     if(clazz != null) {
+                        Configuration.taintTagFactoryPackage = clazz.getPackage().getName().replace('.', '/');
+
                         Configuration.taintTagFactory = clazz.newInstance();
                     }
                 } catch(Exception e) {

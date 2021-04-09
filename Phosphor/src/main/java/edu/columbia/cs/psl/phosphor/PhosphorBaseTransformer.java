@@ -5,7 +5,7 @@ import edu.columbia.cs.psl.phosphor.runtime.StringUtils;
 import java.security.ProtectionDomain;
 
 /* Provides appropriate phosphor tagged versions of transform. */
-public abstract class PhosphorBaseTransformer {
+public abstract class PhosphorBaseTransformer  {
 
     public static boolean INITED = false;
     protected static int isBusyTransforming = 0;

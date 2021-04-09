@@ -100,6 +100,7 @@ public class MethodArgReindexer extends MethodVisitor {
                 }
             }
         }
+
         if((Configuration.IMPLICIT_HEADERS_NO_TRACKING || Configuration.IMPLICIT_TRACKING) && !name.equals("<clinit>")) {
             hasBeenRemapped = true;
             indexOfControlTagsInLocals = oldArgTypes.length + newArgOffset + (isStatic ? 0 : 1);
@@ -110,6 +111,11 @@ public class MethodArgReindexer extends MethodVisitor {
         if(hasPreAllocatedReturnAddress) {
             newReturnType = Type.getReturnType(desc);
             newArgOffset++;
+            nNewArgs++;
+        }
+        if(TaintUtils.isErasedReturnType(Type.getReturnType(originalDesc))) {
+            hasBeenRemapped = true;
+            nWrappers++;
             nNewArgs++;
         }
         newArgOffset += nWrappers;

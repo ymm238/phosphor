@@ -1,6 +1,7 @@
 package edu.columbia.cs.psl.test.phosphor;
 
 import edu.columbia.cs.psl.phosphor.runtime.MultiTainter;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.security.PrivilegedActionException;
@@ -11,7 +12,6 @@ import java.util.List;
 import java.util.function.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static java.security.AccessController.doPrivileged;
 import static org.junit.Assert.assertEquals;
@@ -28,6 +28,16 @@ public class LambdaObjTagITCase extends BaseMultiTaintClass {
 		consumer2.accept(new double[1], new double[1]);
 	}
 
+	float getFloat() {
+		return 0f;
+	}
+
+	@Test
+	public void testFloat2DoubleSupplier() throws Exception {
+		DoubleSupplier supplier = ((DoubleSupplier) this::getFloat);
+		double d = supplier.getAsDouble();
+	}
+
 	@Test
 	public void testCollectors() {
 		List<String> givenList = Arrays.asList("a", "bb", "ccc", "dd");
@@ -37,6 +47,13 @@ public class LambdaObjTagITCase extends BaseMultiTaintClass {
 	@Test
 	public void testIntStreamsDoNotCrash() {
 		int sum = IntStream.of(1, 2, 3, 4, 5).sum(); // creates a bunch of lambdas
+	}
+
+	//This test is interesting because Character::toLowerCase is a wrapped (not instrumented) method
+	@Test
+	public void testLambdaCallsMethodIgnoredFromInstrumentation(){
+		String name = "a";
+		name.chars().map(Character::toLowerCase).forEach((c)->{});
 	}
 
 	@Test
@@ -99,4 +116,22 @@ public class LambdaObjTagITCase extends BaseMultiTaintClass {
 		BinaryOperator<Integer> sum = Integer::sum;
 		Integer result = sum.apply(0, 5);
 	}
+
+	static void tryRunner(Runnable runnable) {
+		runnable.run();
+	}
+
+	static void print() {
+		System.out.println("Success!");
+		staticRunnableMethodRan = true;
+	}
+
+	static boolean staticRunnableMethodRan = false;
+	@Test
+    public void testStaticRunnableMethod(){
+		staticRunnableMethodRan = false;
+		tryRunner(LambdaObjTagITCase::print);
+		Assert.assertTrue(staticRunnableMethodRan);
+	}
+
 }
