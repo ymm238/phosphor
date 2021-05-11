@@ -73,6 +73,11 @@ public class PreMain {
         premain(args, instr);
     }
 
+    public static void premain$$PHOSPHORTAGGED(String args, Taint argsTaint, final Instrumentation instr, Taint instrTaint, ControlFlowStack ctrl) {
+        premain(args, instr);
+    }
+
+
     public static void premain(String args, final Instrumentation instr) {
         edu.columbia.cs.psl.phosphor.PreMain.premain(args, new InstrumentationHelper() {
             @Override

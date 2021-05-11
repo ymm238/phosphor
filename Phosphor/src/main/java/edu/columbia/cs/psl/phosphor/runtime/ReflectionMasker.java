@@ -12,8 +12,8 @@ import edu.columbia.cs.psl.phosphor.struct.harmony.util.LinkedList;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArray;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArrayWithObjTag;
 import org.objectweb.asm.Type;
-import sun.misc.Unsafe;
 
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.lang.reflect.*;
 
@@ -35,29 +35,6 @@ public class ReflectionMasker {
 
     private ReflectionMasker() {
         // Prevents this class from being instantiated
-    }
-
-    @SuppressWarnings("unused")
-    public static TaintedReferenceWithObjTag getObject$$PHOSPHORTAGGED(Unsafe u, Taint uT, Object obj, Taint<?> tag, long offset, Taint oT, ControlFlowStack ctrl, TaintedReferenceWithObjTag ret, Object e) {
-        RuntimeUnsafePropagator.getObject$$PHOSPHORTAGGED(u, uT, obj, tag, offset, oT, ret, e);
-        return ret;
-    }
-
-    @SuppressWarnings("unused")
-    public static TaintedReferenceWithObjTag getObject$$PHOSPHORTAGGED(Unsafe u, Taint unsafeTaint, Object obj, Taint<?> tag, long offset, Taint offsetTag, TaintedReferenceWithObjTag ret, Object e) {
-        RuntimeUnsafePropagator.getObject$$PHOSPHORTAGGED(u, unsafeTaint, obj, tag, offset, offsetTag, ret, e);
-        return ret;
-    }
-
-    @SuppressWarnings("unused")
-    public static void putObject$$PHOSPHORTAGGED(Unsafe u, Taint unsafetaint, Object obj, Taint<?> tag, long fieldOffset, Taint offsetTag, Object val, Taint valTaint, ControlFlowStack ctrl) {
-        RuntimeUnsafePropagator.putObject$$PHOSPHORTAGGED(u, unsafetaint, obj, tag, fieldOffset, offsetTag, val, valTaint);
-    }
-
-    @SuppressWarnings("unused")
-    public static void putObject$$PHOSPHORTAGGED(Unsafe u, Taint unsafetaint, Object obj, Taint<?> tag, long fieldOffset, Taint offsetTag, Object val, Taint valTaint) {
-        //TODO go straight to runtimeunsafeprop instead?
-        RuntimeUnsafePropagator.putObject$$PHOSPHORTAGGED(u, unsafetaint, obj, tag, fieldOffset, offsetTag, val, valTaint);
     }
 
 
@@ -832,6 +809,39 @@ public class ReflectionMasker {
         ret.taint = tag; //TODO also from string?
         return ret;
     }
+
+    public static TaintedReferenceWithObjTag lastParameterType$$PHOSPHOR_TAGGED(MethodType type, Taint typeTag, TaintedReferenceWithObjTag ret, Class erasedRet){
+        ret.taint = Taint.emptyTaint();
+        ret.val = lastParameterType(type);
+        return ret;
+    }
+
+    public static Class<?> lastParameterType(MethodType type){
+        //Calculate how much junk we add to the end of the method descriptor after the last argument, return the actual last type.
+        int numExtraParamsAfterOriginalLastParam = 0;
+        if (type.returnType() == TaintedReferenceWithObjTag.class) {
+            numExtraParamsAfterOriginalLastParam++; //for the erased return type
+        }
+        boolean isRewrittenType = false;
+
+        // Find erased types
+        for (int i = 0; i < type.parameterCount(); i++) {
+            if (TaintUtils.isWrappedTypeWithErasedType(Type.getType(type.parameterType(i)))) {
+                numExtraParamsAfterOriginalLastParam++;
+            }
+            if (type.parameterType(i) == Taint.class) {
+                isRewrittenType = true;
+            }
+        }
+        Class toRet =  type.parameterType(type.parameterCount()- 1 - numExtraParamsAfterOriginalLastParam);
+        if (isRewrittenType) {
+            return toRet;
+            //return type.parameterType(type.parameterCount() - 1 - numExtraParamsAfterOriginalLastParam);
+        } else {
+            return type.parameterType(type.parameterCount() - 1);
+        }
+    }
+
 
     private static Method getCachedMethod(Method method) {
         return InstrumentedJREFieldHelper.getPHOSPHOR_TAGmethod(method);

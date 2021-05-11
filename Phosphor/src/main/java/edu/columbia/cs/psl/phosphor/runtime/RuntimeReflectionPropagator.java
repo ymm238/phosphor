@@ -1,5 +1,6 @@
 package edu.columbia.cs.psl.phosphor.runtime;
 
+import edu.columbia.cs.psl.phosphor.Configuration;
 import edu.columbia.cs.psl.phosphor.TaintUtils;
 import edu.columbia.cs.psl.phosphor.control.ControlFlowStack;
 import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREMethodHelper;
@@ -7,32 +8,39 @@ import edu.columbia.cs.psl.phosphor.struct.*;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.WeakHashMap;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArrayWithObjTag;
 import org.objectweb.asm.Type;
-import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 public class RuntimeReflectionPropagator {
 
-    private static Unsafe unsafe;
+    private static sun.misc.Unsafe unsafe8;
+    private static jdk.internal.misc.Unsafe unsafe9;
     private static WeakHashMap<Field, Field> fieldToField = new WeakHashMap<>();
 
     private RuntimeReflectionPropagator() {
         // Prevents this class from being instantiated
     }
 
-    private static Unsafe getUnsafe() {
-        if(unsafe == null) {
-            unsafe = Unsafe.getUnsafe();
+    private static sun.misc.Unsafe getUnsafe8() {
+        if(unsafe8 == null) {
+            unsafe8 = sun.misc.Unsafe.getUnsafe();
         }
-        return unsafe;
+        return unsafe8;
     }
 
-    public static TaintedReferenceWithObjTag getType$$PHOSPHORTAGGED(Field f, Taint fieldtaint, ControlFlowStack ctrl, TaintedReferenceWithObjTag ret) {
-        return getType$$PHOSPHORTAGGED(f, fieldtaint, ret);
+    private static jdk.internal.misc.Unsafe getUnsafe9() {
+        if(unsafe9 == null) {
+            unsafe9 = jdk.internal.misc.Unsafe.getUnsafe();
+        }
+        return unsafe9;
     }
 
-    public static TaintedReferenceWithObjTag getType$$PHOSPHORTAGGED(Field f, Taint fieldTaint, TaintedReferenceWithObjTag ret) {
+    public static TaintedReferenceWithObjTag getType$$PHOSPHORTAGGED(Field f, Taint fieldtaint, ControlFlowStack ctrl, TaintedReferenceWithObjTag ret, Class erasedReturn) {
+        return getType$$PHOSPHORTAGGED(f, fieldtaint, ret, erasedReturn);
+    }
+
+    public static TaintedReferenceWithObjTag getType$$PHOSPHORTAGGED(Field f, Taint fieldTaint, TaintedReferenceWithObjTag ret, Class erasedReturn) {
         String name = f.getName();
         ret.taint = fieldTaint;
         if(f.getName().endsWith(TaintUtils.TAINT_FIELD) || f.getName().endsWith(TaintUtils.TAINT_WRAPPER_FIELD) || f.getDeclaringClass().getName().contains("edu.columbia.cs.psl.phosphor")) {
@@ -63,16 +71,16 @@ public class RuntimeReflectionPropagator {
         return ret;
     }
 
-    public static TaintedReferenceWithObjTag get$$PHOSPHORTAGGED(Field f, Taint fieldTaint, Object obj, Taint objTaint, ControlFlowStack ctrl, TaintedReferenceWithObjTag ret) throws IllegalArgumentException, IllegalAccessException {
+    public static TaintedReferenceWithObjTag get$$PHOSPHORTAGGED(Field f, Taint fieldTaint, Object obj, Taint objTaint, ControlFlowStack ctrl, TaintedReferenceWithObjTag ret, Object erasedReturn) throws IllegalArgumentException, IllegalAccessException {
         if(f.getType().isPrimitive()) {
-            return get$$PHOSPHORTAGGED(f, fieldTaint, obj, objTaint, ret);
+            return get$$PHOSPHORTAGGED(f, fieldTaint, obj, objTaint, ret, erasedReturn);
         }
         f.setAccessible(true);
-        InstrumentedJREMethodHelper.java_lang_reflect_Field_get$$PHOSPHORTAGGED(f, fieldTaint, obj, objTaint, ctrl, ret);
+        InstrumentedJREMethodHelper.java_lang_reflect_Field_get$$PHOSPHORTAGGED_i(f, fieldTaint, obj, objTaint, ctrl, ret, erasedReturn);
         return ret;
     }
 
-    public static TaintedReferenceWithObjTag get$$PHOSPHORTAGGED(Field f, Taint fieldTaint, Object obj, Taint objTaint, TaintedReferenceWithObjTag _ret) throws IllegalArgumentException, IllegalAccessException {
+    public static TaintedReferenceWithObjTag get$$PHOSPHORTAGGED(Field f, Taint fieldTaint, Object obj, Taint objTaint, TaintedReferenceWithObjTag _ret, Object erasedReturn) throws IllegalArgumentException, IllegalAccessException {
         f.setAccessible(true);
         _ret.taint = objTaint;
         if(f.getType().isPrimitive()) {
@@ -112,7 +120,7 @@ public class RuntimeReflectionPropagator {
                 throw new IllegalArgumentException();
             }
         } else {
-            InstrumentedJREMethodHelper.java_lang_reflect_Field_get$$PHOSPHORTAGGED(f, fieldTaint, obj, objTaint, _ret);
+            InstrumentedJREMethodHelper.java_lang_reflect_Field_get$$PHOSPHORTAGGED_i(f, fieldTaint, obj, objTaint, _ret, erasedReturn);
         }
         return _ret;
     }
@@ -761,8 +769,13 @@ public class RuntimeReflectionPropagator {
         if(f.getType().isArray() && val instanceof LazyArrayObjTags) {
             try {
                 Field taintField = f.getDeclaringClass().getDeclaredField(f.getName() + TaintUtils.TAINT_WRAPPER_FIELD);
-                Unsafe u = getUnsafe();
-                u.putObject(obj, u.objectFieldOffset(taintField), val);
+                if(Configuration.IS_JAVA_8){
+                    sun.misc.Unsafe u = getUnsafe8();
+                    u.putObject(obj, u.objectFieldOffset(taintField), val);
+                } else{
+                    jdk.internal.misc.Unsafe u = getUnsafe9();
+                    u.putReference(obj, u.objectFieldOffset(taintField), val);
+                }
             } catch(NoSuchFieldException | SecurityException e) {
                 //
             }
@@ -874,11 +887,20 @@ public class RuntimeReflectionPropagator {
         if(f.getType().isArray() && val instanceof LazyArrayObjTags) {
             try {
                 Field taintField = f.getDeclaringClass().getDeclaredField(f.getName() + TaintUtils.TAINT_WRAPPER_FIELD);
-                Unsafe u = getUnsafe();
-                if(Modifier.isStatic(f.getModifiers())) {
-                    u.putObject(u.staticFieldBase(taintField), u.staticFieldOffset(taintField), val);
+                if(Configuration.IS_JAVA_8) {
+                    sun.misc.Unsafe u = getUnsafe8();
+                    if (Modifier.isStatic(f.getModifiers())) {
+                        u.putObject(u.staticFieldBase(taintField), u.staticFieldOffset(taintField), val);
+                    } else {
+                        u.putObject(obj, u.objectFieldOffset(taintField), val);
+                    }
                 } else {
-                    u.putObject(obj, u.objectFieldOffset(taintField), val);
+                    jdk.internal.misc.Unsafe u = getUnsafe9();
+                    if (Modifier.isStatic(f.getModifiers())) {
+                        u.putReference(u.staticFieldBase(taintField), u.staticFieldOffset(taintField), val);
+                    } else {
+                        u.putReference(obj, u.objectFieldOffset(taintField), val);
+                    }
                 }
             } catch(NoSuchFieldException | SecurityException e) {
                 //

@@ -113,6 +113,15 @@ public abstract class LazyArrayObjTags implements Cloneable, Serializable {
         return index;
     }
 
+    public int unsafeIndexFor(jdk.internal.misc.Unsafe unsafe, long offset) {
+        Class<?> clazz = getVal().getClass();
+        long baseOffset = unsafe.arrayBaseOffset(clazz);
+        long scale = unsafe.arrayIndexScale(clazz);
+        // Calculate the index based off the offset
+        int index = (int) ((offset - baseOffset) / scale);
+        return index;
+    }
+
     public void setTaint(int idx, Taint valTaint) {
         if(taints == null) {
             taints = new Taint[getLength()];

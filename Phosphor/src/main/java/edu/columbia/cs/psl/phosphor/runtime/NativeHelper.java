@@ -106,7 +106,7 @@ public final class NativeHelper {
             }
             if(tmp != null) {
                 in.clear();
-                InstrumentedJREMethodHelper.java_util_Collection_add$$PHOSPHORTAGGED(tmp, Configuration.controlFlowManager.getStack(false), new TaintedBooleanWithObjTag());
+                InstrumentedJREMethodHelper.java_util_Collection_add$$PHOSPHORTAGGED_i(tmp, Configuration.controlFlowManager.getStack(false), new TaintedBooleanWithObjTag());
             }
         }
         return in;

@@ -93,7 +93,8 @@ public class Instrumenter {
         return (StringUtils.startsWith(owner, "java/lang/invoke/MethodHandle")  && !"java/lang/invoke/MethodHandleImpl$Intrinsic".equals(owner))
                 || (StringUtils.startsWith(owner, "java/lang/invoke/BoundMethodHandle") && !StringUtils.startsWith(owner, "java/lang/invoke/BoundMethodHandle$Factory"))
                 || StringUtils.startsWith(owner, "java/lang/invoke/DelegatingMethodHandle")
-                || owner.equals("java/lang/invoke/DirectMethodHandle");
+                || owner.equals("java/lang/invoke/DirectMethodHandle")
+                || owner.equals("java/lang/invoke/DirectMethodHandle$Constructor");
     }
 
     public static boolean isIgnoredClass(String owner) {
@@ -121,21 +122,42 @@ public class Instrumenter {
                 || StringUtils.startsWith(owner, "edu/gmu/swe/phosphor/ignored")
                 || StringUtils.startsWith(owner, "sun/awt/image/codec/")
                 || StringUtils.startsWith(owner, "com/sun/image/codec/")
-                || StringUtils.startsWith(owner, "sun/reflect/Reflection") //was on last
-                || owner.equals("java/lang/reflect/Proxy") //was on last
-                || StringUtils.startsWith(owner, "sun/reflection/annotation/AnnotationParser") //was on last
-                || StringUtils.startsWith(owner, "sun/reflect/MethodAccessor") //was on last
                 || StringUtils.startsWith(owner, "org/apache/jasper/runtime/JspSourceDependent")
-                || StringUtils.startsWith(owner, "sun/reflect/ConstructorAccessor") //was on last
+                // || owner.equals("java/lang/reflect/Proxy") //Proxy now has a lambda in it, if we don't instrument it, we'll get abstracmethoderrors on the lambda
+
+                // Internal JVM reflection-related classes. Sub-types of these will be loaded into the JVM in a way that we can't instrument.
+                || StringUtils.startsWith(owner, "sun/reflect/Reflection")
+                || StringUtils.startsWith(owner, "sun/reflect/MethodAccessor")
+                || StringUtils.startsWith(owner, "sun/reflect/ConstructorAccessor")
                 || StringUtils.startsWith(owner, "sun/reflect/SerializationConstructorAccessor")
                 || StringUtils.startsWith(owner, "sun/reflect/GeneratedMethodAccessor")
                 || StringUtils.startsWith(owner, "sun/reflect/GeneratedConstructorAccessor")
                 || StringUtils.startsWith(owner, "sun/reflect/GeneratedSerializationConstructor")
-                || StringUtils.startsWith(owner, "sun/awt/image/codec/")
-                || StringUtils.startsWith(owner, "java/lang/invoke/LambdaForm")
+
+
+                //Same as above, but java 9+ class names
+                //|| StringUtils.startsWith(owner, "jdk/internal/reflect/Reflection")//If do this, need to allow inner classes in ReflectionFactory, e.g. ReflectioNFactory$GetRefelctionFactoryAction
+                || owner.equals("jdk/internal/reflect/Reflection")
+                || owner.equals("jdk/internal/reflect/MethodAccessor")
+                || owner.equals("jdk/internal/reflect/MethodAccessorImpl")
+                || owner.equals("jdk/internal/reflect/MethodAccessorGenerator")
+                || owner.equals("jdk/internal/reflect/ConstructorAccessor")
+                || owner.equals("jdk/internal/reflect/ConstructorAccessorImpl")
+                || StringUtils.startsWith(owner, "jdk/internal/reflect/SerializationConstructorAccessor")
+                || StringUtils.startsWith(owner, "jdk/internal/reflect/GeneratedMethodAccessor")
+                || StringUtils.startsWith(owner, "jdk/internal/reflect/GeneratedConstructorAccessor")
+                || StringUtils.startsWith(owner, "jdk/internal/reflect/GeneratedSerializationConstructor")
+
+                || owner.equals("java/lang/invoke/LambdaForm")
+                || StringUtils.startsWith(owner, "java/lang/invoke/LambdaForm$")
                 || StringUtils.startsWith(owner, "java/lang/invoke/LambdaMetafactory")
                 || StringUtils.startsWith(owner, "edu/columbia/cs/psl/phosphor/struct/TaintedWith")
-                || StringUtils.startsWith(owner, "java/util/regex/HashDecompositions"); //Huge constant array/hashmap
+                || StringUtils.startsWith(owner, "java/util/r" +
+                "egex/HashDecompositions") //Huge constant array/hashmap
+                || StringUtils.startsWith(owner, "jdk/internal/module/SystemModules")
+                || StringUtils.startsWith(owner, "jdk/internal/misc/UnsafeConstants")
+
+                || StringUtils.startsWith(owner, "jdk/internal/misc/UnsafeConstants");
     }
 
     public static void analyzeClass(InputStream is) {
@@ -326,7 +348,8 @@ public class Instrumenter {
 
         if(f.isDirectory()) {
             toWait.addAll(processDirectory(f, rootOutputDir, true, executor));
-        } else if(inputFolder.endsWith(".jar") || inputFolder.endsWith(".zip") || inputFolder.endsWith(".war")) {
+        } else if(inputFolder.endsWith(".jar") || inputFolder.endsWith(".zip") || inputFolder.endsWith(".war")
+                || inputFolder.endsWith(".jmod")) {
             toWait.addAll(processZip(f, rootOutputDir, executor));
         } else if(inputFolder.endsWith(".class")) {
             toWait.addAll(processClass(f, rootOutputDir, executor));
@@ -404,7 +427,8 @@ public class Instrumenter {
                 ret.addAll(processDirectory(fi, thisOutputDir, false, executor));
             } else if(fi.getName().endsWith(".class")) {
                 ret.addAll(processClass(fi, thisOutputDir, executor));
-            } else if(fi.getName().endsWith(".jar") || fi.getName().endsWith(".zip") || fi.getName().endsWith(".war")) {
+            } else if(fi.getName().endsWith(".jar") || fi.getName().endsWith(".zip") || fi.getName().endsWith(".war")
+                    || fi.getName().endsWith(".jmod")) {
                 ret.addAll(processZip(fi, thisOutputDir, executor));
             } else {
                 File dest = new File(thisOutputDir.getPath() + File.separator + fi.getName());
@@ -651,8 +675,11 @@ public class Instrumenter {
         if (owner.equals("jdk/internal/reflect/Reflection") && name.equals("getCallerClass")) {
             return true;
         }
-        return owner.equals("java/lang/invoke/MethodHandle")
-                && ((name.equals("invoke") || name.equals("invokeBasic") || name.startsWith("linkTo")));
+        if (owner.equals("java/lang/invoke/MethodHandle")
+                && ((name.equals("invoke") || name.equals("invokeBasic") || name.startsWith("linkTo")))) {
+            return true;
+        }
+        return owner.equals("java/lang/invoke/VarHandle"); //TODO wrap these all
     }
 
     public static boolean isUninstrumentedField(String owner, String name) {
@@ -720,8 +747,11 @@ public class Instrumenter {
         cr.accept(classNode, attrs.toArray(new Attribute[0]), 0);
         //Add export
         classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor", 0, null));
+        classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor/control", 0, null));
+        classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor/control/standard", 0, null));
         classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor/runtime", 0, null));
         classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor/struct", 0, null));
+        classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor/struct/multid", 0, null));
 
         //Add pac
         classNode.module.packages.addAll(packages);
@@ -730,10 +760,35 @@ public class Instrumenter {
         return cw.toByteArray();
     }
 
+    public static byte[] transformJDKUnsupportedModuleInfo(InputStream is, java.util.Collection<String> packages) throws IOException {
+        ClassNode classNode = new ClassNode();
+        ClassReader cr = new ClassReader(is);
+        java.util.List<Attribute> attrs = new java.util.ArrayList<>();
+        attrs.add(new ModuleTargetAttribute());
+        attrs.add(new ModuleResolutionAttribute());
+        attrs.add(new ModuleHashesAttribute());
+
+        cr.accept(classNode, attrs.toArray(new Attribute[0]), 0);
+        //Add export
+        classNode.module.exports.add(new ModuleExportNode("edu/columbia/cs/psl/phosphor/runtime/jdk/unsupported", 0, null));
+
+        //Add pac
+        classNode.module.packages.addAll(packages);
+        ClassWriter cw = new ClassWriter(0);
+        classNode.accept(cw);
+        return cw.toByteArray();
+    }
+
+
     public static boolean isJava8JVMDir(File java_home) {
         return new File(java_home, "bin" + File.separator + "java").exists()
                 && !new File(java_home, "jmods").exists()
                 && !new File(java_home, "lib" + File.separator + "modules").exists();
+    }
+
+    public static boolean isUnsafeClass(String className){
+        return (Configuration.IS_JAVA_8 && "sun/misc/Unsafe".equals(className))
+                || (!Configuration.IS_JAVA_8 && "jdk/internal/misc/Unsafe".equals(className));
     }
 
 }

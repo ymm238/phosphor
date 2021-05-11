@@ -62,6 +62,7 @@ public class PhosphorJLinkPlugin implements Plugin {
         TaintUtils.VERIFY_CLASS_GENERATION = true;
         PhosphorOption.configure(false, createPhosphorMainArguments(config));
         phosphorJar = getPhosphorJarFile();
+        System.out.println("Embedding Phosphor from: " + phosphorJar);
         //TODO process args
     }
 
@@ -82,7 +83,9 @@ public class PhosphorJLinkPlugin implements Plugin {
                                 HashSet<String> packages = new HashSet<>();
                                 while (phosphorEntries.hasMoreElements()) {
                                     ZipEntry pe = phosphorEntries.nextElement();
-                                    if (pe.getName().startsWith("fun/jvm/phosphor/instrumenter/jlink") || pe.getName().endsWith("module-info.class")) {
+                                    if (pe.getName().startsWith("fun/jvm/phosphor/instrumenter/jlink")
+                                            || pe.getName().endsWith("module-info.class")
+                                            || pe.getName().startsWith("edu/columbia/cs/psl/phosphor/runtime/jdk/unsupported")) {
                                         continue;
                                     } else if (pe.getName().endsWith(".class")) {
                                         InputStream is = phosphorZip.getInputStream(pe);
@@ -102,8 +105,33 @@ public class PhosphorJLinkPlugin implements Plugin {
                             } catch (IOException ex) {
                                 ex.printStackTrace();
                             }
-                        }
+                        } else if(resourcePoolEntry.path().startsWith("/jdk.unsupported")){
+                            //This is the jdk.unsupported module-info.class file. Transform it, and then add in phosphor
+                            try {
+                                ZipFile phosphorZip = new ZipFile(phosphorJar);
+                                Enumeration<? extends ZipEntry> phosphorEntries = phosphorZip.entries();
+                                HashSet<String> packages = new HashSet<>();
+                                while (phosphorEntries.hasMoreElements()) {
+                                    ZipEntry pe = phosphorEntries.nextElement();
+                                    if(pe.getName().startsWith("edu/columbia/cs/psl/phosphor/runtime/jdk/unsupported") && pe.getName().endsWith(".class")){
+                                        InputStream is = phosphorZip.getInputStream(pe);
+                                        out.add(ResourcePoolEntry.create("/jdk.unsupported/" + pe.getName(), is.readAllBytes()));
+                                        is.close();
 
+                                        //package name
+                                        packages.add(pe.getName().substring(0, pe.getName().lastIndexOf('/')));
+                                    }
+                                }
+                                phosphorZip.close();
+
+                                byte[] newContent = Instrumenter.transformJDKUnsupportedModuleInfo(resourcePoolEntry.content(), packages);
+                                if (newContent != null) {
+                                    resourcePoolEntry = resourcePoolEntry.copyWithContent(newContent);
+                                }
+                            } catch (IOException ex) {
+                                ex.printStackTrace();
+                            }
+                        }
                     } else {
                         byte[] newContent = Instrumenter.instrumentClass(resourcePoolEntry.path(), resourcePoolEntry.content(), true);
                         if (newContent != null) {

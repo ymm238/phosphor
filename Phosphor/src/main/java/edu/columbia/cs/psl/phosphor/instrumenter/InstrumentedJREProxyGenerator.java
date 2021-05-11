@@ -111,7 +111,7 @@ public class InstrumentedJREProxyGenerator {
         Type[] args = Type.getArgumentTypes(descriptor);
         int argIdx = 0;
         for (int i = 0; i < args.length; i++) {
-            ga.visitVarInsn(Opcodes.ALOAD, argIdx);
+            ga.visitVarInsn(args[i].getOpcode(Opcodes.ILOAD), argIdx);
             argIdx += args[i].getSize();
         }
         ga.visitMethodInsn(opcode, owner, methodName, descriptorToInvoke, isIface);

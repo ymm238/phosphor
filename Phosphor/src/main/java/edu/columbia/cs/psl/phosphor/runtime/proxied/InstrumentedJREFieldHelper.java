@@ -1,6 +1,6 @@
 package edu.columbia.cs.psl.phosphor.runtime.proxied;
 
-import edu.columbia.cs.psl.phosphor.runtime.RuntimeUnsafePropagator;
+import edu.columbia.cs.psl.phosphor.runtime.RuntimeJDKInternalUnsafePropagator;
 import edu.columbia.cs.psl.phosphor.runtime.Taint;
 import edu.columbia.cs.psl.phosphor.struct.LazyByteArrayObjTags;
 import edu.columbia.cs.psl.phosphor.struct.LazyCharArrayObjTags;
@@ -46,11 +46,11 @@ public class InstrumentedJREFieldHelper {
         throw _crash();
     }
 
-    public static SinglyLinkedList<RuntimeUnsafePropagator.OffsetPair> get$$PHOSPHOR_OFFSET_CACHE(Class<?> cl) {
+    public static SinglyLinkedList<RuntimeJDKInternalUnsafePropagator.OffsetPair> get$$PHOSPHOR_OFFSET_CACHE(Class<?> cl) {
         throw _crash();
     }
 
-    public static void set$$PHOSPHOR_OFFSET_CACHE(Class<?> cl, SinglyLinkedList<RuntimeUnsafePropagator.OffsetPair> offsetPairs) {
+    public static void set$$PHOSPHOR_OFFSET_CACHE(Class<?> cl, SinglyLinkedList<RuntimeJDKInternalUnsafePropagator.OffsetPair> offsetPairs) {
         throw _crash();
     }
 

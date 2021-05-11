@@ -34,6 +34,10 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <source>9</source>
+                    <target>9</target>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>edu.gmu.swe.phosphor</groupId>
@@ -137,7 +141,7 @@
                                     <property name="phosphor.jar" value="${maven.dependency.edu.gmu.swe.phosphor.Phosphor.jar.path}"/>
                                     <property name="phosphor-javaagent.jar" value="${maven.dependency.edu.gmu.swe.phosphor.phosphor-javaagent.jar.path}"/>
                                     <property name="argLine.prefix"
-                                              value="-Dphosphor.verify=true -javaagent:${phosphor-javaagent.jar}=${auto.taint} -XX:+TraceExceptions "/>
+                                              value="--add-exports java.base/jdk.internal.misc=ALL-UNNAMED -Dphosphor.verify=true -Dphosphor.debug=true -XX:SuppressErrorAt=/loopnode.cpp:3771 -XX:SuppressErrorAt=/ciTypeFlow.hpp:382 -XX:SuppressErrorAt=/c1_ValueStack.hpp:53 -javaagent:${phosphor-javaagent.jar}=${auto.taint}"/>
                                 </target>
                             </configuration>
                         </execution>

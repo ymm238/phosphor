@@ -19,9 +19,10 @@ public class JLinkInvoker {
                 "-J--add-modules=fun.jvm.phosphor.instrumenter.jlink",
                 "--output=" + instJVMDir,
                 "--phosphor-transformer=transform" + createPhosphorJLinkPluginArgument(properties),
-                "--add-modules=java.base,jdk.jdwp.agent,java.instrument"
+                "--add-modules=java.base,jdk.jdwp.agent,java.instrument,jdk.unsupported"
         );
         try {
+            System.out.println(pb.command());
             Process p = pb.inheritIO().start();
             p.waitFor();
         } catch (IOException | InterruptedException e) {

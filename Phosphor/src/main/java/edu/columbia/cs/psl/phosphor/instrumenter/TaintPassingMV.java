@@ -52,6 +52,7 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
     private final String descriptor;
     private final MethodVisitor passThroughMV;
     private final boolean rewriteLVDebug;
+    private final boolean isDefinedOnAnInterface;
     private final boolean isLambda;
     private final boolean isObjOutputStream;
     private final ControlFlowPropagationPolicy controlFlowPolicy;
@@ -64,11 +65,12 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
     private boolean isTaintlessArrayStore = false;
     private boolean doNotUnboxTaints;
     private boolean isAtStartOfExceptionHandler;
+    private boolean isRewrittenMethodDescriptorOrName;
 
     public TaintPassingMV(MethodVisitor mv, int access, String owner, String name, String descriptor, String signature,
                           String[] exceptions, String originalDesc, NeverNullArgAnalyzerAdapter analyzer,
                           MethodVisitor passThroughMV, LinkedList<MethodNode> wrapperMethodsToAdd,
-                          ControlFlowPropagationPolicy controlFlowPolicy) {
+                          ControlFlowPropagationPolicy controlFlowPolicy, boolean isDefinedOnAnInterface) {
         super(access, owner, name, descriptor, signature, exceptions, mv, analyzer);
         taintTagFactory.instrumentationStarting(access, name, descriptor);
         this.isLambda = this.isIgnoreAllInstrumenting = owner.contains("$Lambda$");
@@ -79,6 +81,7 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
         this.passThroughMV = passThroughMV;
         this.descriptor = descriptor;
         this.isStatic = (access & Opcodes.ACC_STATIC) != 0;
+        this.isDefinedOnAnInterface = isDefinedOnAnInterface;
         this.isObjOutputStream = (owner.equals("java/io/ObjectOutputStream") && name.startsWith("writeObject0"))
                 || (owner.equals("java/io/ObjectInputStream") && name.startsWith("defaultReadFields"));
         this.paramTypes = calculateParamTypes(isStatic, descriptor);
@@ -86,6 +89,7 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
         this.originalMethodReturnType = Type.getReturnType(originalDesc);
         this.newReturnType = Type.getReturnType(descriptor);
         this.controlFlowPolicy = controlFlowPolicy;
+        this.isRewrittenMethodDescriptorOrName = !originalDesc.equals(descriptor) || name.endsWith(TaintUtils.METHOD_SUFFIX);
     }
 
     @Override
@@ -662,7 +666,7 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                     }
 
                     MethodNode wrapperMethod = new MethodNode(Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_PUBLIC, "invokeDynamicHelper$" + implMethod.getOwner().replace('/', '$') + "$" + implMethod.getName().replace("<", "").replace(">", "") + "$" + wrapperMethodsToAdd.size(), wrapperImplDesc, null, null);
-                    bsmArgs[1] = new Handle(H_INVOKESTATIC, className, wrapperMethod.name, wrapperMethod.desc, true);
+                    bsmArgs[1] = new Handle(H_INVOKESTATIC, className, wrapperMethod.name, wrapperMethod.desc, this.isDefinedOnAnInterface);
 
                     wrapperMethodsToAdd.add(wrapperMethod);
                     NeverNullArgAnalyzerAdapter an = new NeverNullArgAnalyzerAdapter(className, Opcodes.ACC_STATIC, wrapperMethod.name, wrapperMethod.desc, wrapperMethod);
@@ -721,9 +725,9 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
                                 ga.visitTypeInsn(Opcodes.INSTANCEOF, Type.getInternalName(LazyArrayObjTags.class));
                                 ga.visitInsn(Opcodes.IOR);
                                 ga.visitJumpInsn(Opcodes.IFEQ, isOK);
-                                if (className.equals("sun/misc/Unsafe")) {
+                                if (Instrumenter.isUnsafeClass(className)) {
                                     ga.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(MultiDTaintedArrayWithObjTag.class), "unboxRawOnly1D", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
-                                } else if (className.equals("sun/reflect/NativeMethodAccessorImpl") && "invoke0".equals(implMethod.getName()) && Type.getType(Object.class).equals(t)) {
+                                } else if ((className.equals("sun/reflect/NativeMethodAccessorImpl") || className.equals("jdk/internal/reflect/NativeMethodAccessorImpl")) && "invoke0".equals(implMethod.getName()) && Type.getType(Object.class).equals(t)) {
                                     ga.loadArg(0);
                                     ga.visitInsn(Opcodes.SWAP);
                                     ga.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(MultiDTaintedArray.class), "unboxMethodReceiverIfNecessary", "(Ljava/lang/reflect/Method;Ljava/lang/Object;)Ljava/lang/Object;", false);
@@ -987,7 +991,8 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
         }
         if(hasNewName && !Instrumenter.isIgnoredClass(bsm.getOwner()) && !Instrumenter.isIgnoredClassWithStubsButNoTracking(bsm.getOwner())) {
             if(!Instrumenter.isIgnoredMethod(bsm.getOwner(), bsm.getName(), bsm.getDesc()) && !TaintUtils.remapMethodDescAndIncludeReturnHolder(true, bsm.getDesc()).equals(bsm.getDesc())) {
-                bsm = new Handle(bsm.getTag(), bsm.getOwner(), bsm.getName() + TaintUtils.METHOD_SUFFIX, TaintUtils.remapMethodDescAndIncludeReturnHolder(true, bsm.getDesc()), bsm.isInterface());
+                boolean isVirtual = bsm.getTag() == Opcodes.H_INVOKEVIRTUAL || bsm.getTag() == Opcodes.H_INVOKESPECIAL || bsm.getTag() == Opcodes.H_INVOKEINTERFACE;
+                bsm = new Handle(bsm.getTag(), bsm.getOwner(), bsm.getName() + TaintUtils.METHOD_SUFFIX, TaintUtils.remapMethodDescAndIncludeReturnHolder(isVirtual, bsm.getDesc()), bsm.isInterface());
             }
         }
         for(Type arg : Type.getArgumentTypes(newDesc)) {
@@ -1791,7 +1796,10 @@ public class TaintPassingMV extends TaintAdapter implements Opcodes {
 
     @Override
     public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-        if(descriptor.equals("Ljdk/internal/HotSpotIntrinsicCandidate;")){
+        if(isRewrittenMethodDescriptorOrName && (descriptor.equals("Ljdk/internal/HotSpotIntrinsicCandidate;")
+        || descriptor.equals("Ljdk/internal/vm/annotation/IntrinsicCandidate;"))){
+            // HotSpotIntrinsicCandidate can only be on a method that there is an intrinsic provided for, and must be on
+            // all methods for which an intrinsic is provided.
             return null;
         }
         return super.visitAnnotation(descriptor, visible);

@@ -40,11 +40,11 @@ public class InstrumentedJREMethodHelper {
         throw _crash();
     }
 
-    public static TaintedReferenceWithObjTag java_io_ObjectInputStream_readObject$$PHOSPHORTAGGED_i(ObjectInputStream _this, Taint<Object> emptyTaint, ControlFlowStack dummy, TaintedReferenceWithObjTag ret) {
+    public static TaintedReferenceWithObjTag java_io_ObjectInputStream_readObject$$PHOSPHORTAGGED_i(ObjectInputStream _this, Taint<Object> emptyTaint, ControlFlowStack dummy, TaintedReferenceWithObjTag ret, Object erased) {
         throw _crash();
     }
 
-    public static TaintedReferenceWithObjTag java_io_ObjectInputStream_readObject$$PHOSPHORTAGGED_i(ObjectInputStream _this, Taint<Object> emptyTaint, TaintedReferenceWithObjTag ret) {
+    public static TaintedReferenceWithObjTag java_io_ObjectInputStream_readObject$$PHOSPHORTAGGED_i(ObjectInputStream _this, Taint<Object> emptyTaint, TaintedReferenceWithObjTag ret, Object erased) {
         throw _crash();
     }
 
@@ -72,7 +72,7 @@ public class InstrumentedJREMethodHelper {
         throw _crash();
     }
 
-    public static TaintedReferenceWithObjTag java_lang_Double_toString$$PHOSPHORTAGGED(double d, Taint t, TaintedReferenceWithObjTag ret, ControlFlowStack ctrl) {
+    public static TaintedReferenceWithObjTag java_lang_Double_toString$$PHOSPHORTAGGED(double d, Taint t, TaintedReferenceWithObjTag ret, ControlFlowStack ctrl, String erased) {
         throw _crash();
     }
 
@@ -80,11 +80,11 @@ public class InstrumentedJREMethodHelper {
         throw _crash();
     }
 
-    public static TaintedReferenceWithObjTag java_lang_Long_valueOf$$PHOSPHORTAGGED(long l, Taint t, TaintedReferenceWithObjTag ret) {
+    public static TaintedReferenceWithObjTag java_lang_Long_valueOf$$PHOSPHORTAGGED(long l, Taint t, TaintedReferenceWithObjTag ret, Long erased) {
         throw _crash();
     }
 
-    public static TaintedReferenceWithObjTag java_lang_Long_valueOf$$PHOSPHORTAGGED(long l, Taint t, TaintedReferenceWithObjTag ret, ControlFlowStack ctrl) {
+    public static TaintedReferenceWithObjTag java_lang_Long_valueOf$$PHOSPHORTAGGED(long l, Taint t, TaintedReferenceWithObjTag ret, ControlFlowStack ctrl, Long erased) {
         throw _crash();
     }
 
@@ -96,14 +96,14 @@ public class InstrumentedJREMethodHelper {
         throw _crash();
     }
 
-    public static TaintedReferenceWithObjTag java_lang_reflect_Field_get$$PHOSPHORTAGGED(Field f, Taint fieldTaint, Object obj, Taint objTaint, ControlFlowStack ctrl, TaintedReferenceWithObjTag ret) {
+    public static TaintedReferenceWithObjTag java_lang_reflect_Field_get$$PHOSPHORTAGGED_i(Field f, Taint fieldTaint, Object obj, Taint objTaint, ControlFlowStack ctrl, TaintedReferenceWithObjTag ret, Object erasedReturn) {
         throw _crash();
     }
-    public static TaintedReferenceWithObjTag java_lang_reflect_Field_get$$PHOSPHORTAGGED(Field f, Taint fieldTaint, Object obj, Taint objTaint, TaintedReferenceWithObjTag ret) {
+    public static TaintedReferenceWithObjTag java_lang_reflect_Field_get$$PHOSPHORTAGGED_i(Field f, Taint fieldTaint, Object obj, Taint objTaint, TaintedReferenceWithObjTag ret, Object erasedReturn) {
         throw _crash();
     }
 
-    public static TaintedBooleanWithObjTag java_util_Collection_add$$PHOSPHORTAGGED(Collection tmp, ControlFlowStack stack, TaintedBooleanWithObjTag taintedBooleanWithObjTag) {
+    public static TaintedBooleanWithObjTag java_util_Collection_add$$PHOSPHORTAGGED_i(Collection tmp, ControlFlowStack stack, TaintedBooleanWithObjTag taintedBooleanWithObjTag) {
         throw _crash();
     }
 }

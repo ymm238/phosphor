@@ -120,11 +120,11 @@ public final class LazyReferenceArrayObjTags extends LazyArrayObjTags {
                 ControlFlowStack dummy = Configuration.controlFlowManager.getStack(false);
                 dummy.disable();
                 for(int i = 0; i < len; i++) {
-                    val[i] = InstrumentedJREMethodHelper.java_io_ObjectInputStream_readObject$$PHOSPHORTAGGED_i(stream, Taint.emptyTaint(), dummy, ret).val; //Need to ensure that this doesn't get unwrapped!
+                    val[i] = InstrumentedJREMethodHelper.java_io_ObjectInputStream_readObject$$PHOSPHORTAGGED_i(stream, Taint.emptyTaint(), dummy, ret, null).val; //Need to ensure that this doesn't get unwrapped!
                 }
             } else {
                 for(int i = 0; i < len; i++) {
-                    val[i] = InstrumentedJREMethodHelper.java_io_ObjectInputStream_readObject$$PHOSPHORTAGGED_i(stream, Taint.emptyTaint(), ret).val; //Need to ensure that this doesn't get unwrapped!
+                    val[i] = InstrumentedJREMethodHelper.java_io_ObjectInputStream_readObject$$PHOSPHORTAGGED_i(stream, Taint.emptyTaint(), ret, null).val; //Need to ensure that this doesn't get unwrapped!
                 }
             }
         }

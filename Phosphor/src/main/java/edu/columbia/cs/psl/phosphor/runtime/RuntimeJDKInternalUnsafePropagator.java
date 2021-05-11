@@ -4,17 +4,18 @@ import edu.columbia.cs.psl.phosphor.Configuration;
 import edu.columbia.cs.psl.phosphor.TaintUtils;
 import edu.columbia.cs.psl.phosphor.runtime.proxied.InstrumentedJREFieldHelper;
 import edu.columbia.cs.psl.phosphor.struct.*;
+import edu.columbia.cs.psl.phosphor.struct.harmony.util.StringBuilder;
 import edu.columbia.cs.psl.phosphor.struct.multid.MultiDTaintedArray;
-import sun.misc.Unsafe;
+import jdk.internal.misc.Unsafe;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 /* Ensures that calls methods in Unsafe that set or retrieve the value of a field of a Java heap object set and
  * retrieve both the original field and its associated taint field if it has one. */
-public class RuntimeUnsafePropagator {
+public class RuntimeJDKInternalUnsafePropagator {
 
-    private RuntimeUnsafePropagator() {
+    private RuntimeJDKInternalUnsafePropagator() {
         // Prevents this class from being instantiated
     }
 
@@ -33,17 +34,27 @@ public class RuntimeUnsafePropagator {
                     long fieldOffset = (isStatic ? unsafe.staticFieldOffset(field) : unsafe.objectFieldOffset(field));
                     long tagOffset = Unsafe.INVALID_FIELD_OFFSET;
                     long wrapperOffset = Unsafe.INVALID_FIELD_OFFSET;
-                    try {
-                        Field taintField = clazz.getField(field.getName() + TaintUtils.TAINT_FIELD);
-                        if(taintField.getType().equals(Configuration.TAINT_TAG_OBJ_CLASS)) {
-                            tagOffset = (isStatic ? unsafe.staticFieldOffset(taintField) : unsafe.objectFieldOffset(taintField));
+                    if(fieldClazz != Taint.class) {
+                        try {
+                            // Yes, we need to use our own string builder here...
+                            // because java 16 will compile a lambda in here otherwise, and we can't trigger
+                            // that class loading before Properties finishes getting initialized, but Properties' clinit
+                            // will get us here first :'( :'(
+                            StringBuilder taintFieldName = new StringBuilder(field.getName());
+                            taintFieldName.append(TaintUtils.TAINT_FIELD);
+                            Field taintField = clazz.getField(taintFieldName.toString());
+                            if (taintField.getType().equals(Configuration.TAINT_TAG_OBJ_CLASS)) {
+                                tagOffset = (isStatic ? unsafe.staticFieldOffset(taintField) : unsafe.objectFieldOffset(taintField));
+                            }
+                        } catch (Exception e) {
+                            //
                         }
-                    } catch(Exception e) {
-                        //
                     }
                     if(fieldClazz.isArray()) {
                         try {
-                            Field taintField = clazz.getField(field.getName() + TaintUtils.TAINT_WRAPPER_FIELD);
+                            StringBuilder taintFieldName = new StringBuilder(field.getName());
+                            taintFieldName.append(TaintUtils.TAINT_WRAPPER_FIELD);
+                            Field taintField = clazz.getField(taintFieldName.toString());
                             Class<?> taintClazz = taintField.getType();
                             if(taintClazz != null && LazyArrayObjTags.class.isAssignableFrom(taintClazz)) {
                                 wrapperOffset = (isStatic ? unsafe.staticFieldOffset(taintField) : unsafe.objectFieldOffset(taintField));
@@ -126,7 +137,7 @@ public class RuntimeUnsafePropagator {
         prealloc.taint = Taint.emptyTaint();
         OffsetPair pair = getOffsetPair(unsafe, obj, originalOffset);
         if(pair != null && pair.tagFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
-            Object result = (policy == SpecialAccessPolicy.VOLATILE) ? unsafe.getObjectVolatile(obj, pair.tagFieldOffset) : unsafe.getObject(obj, pair.tagFieldOffset);
+            Object result = (policy == SpecialAccessPolicy.VOLATILE) ? unsafe.getReferenceVolatile(obj, pair.tagFieldOffset) : unsafe.getReference(obj, pair.tagFieldOffset);
             if(result instanceof Taint) {
                 prealloc.taint = (Taint) result;
             }
@@ -212,15 +223,15 @@ public class RuntimeUnsafePropagator {
         } else if(prealloc instanceof TaintedReferenceWithObjTag) {
             Object val;
             if(policy == SpecialAccessPolicy.VOLATILE) {
-                val = unsafe.getObjectVolatile(obj, offset);
+                val = unsafe.getReferenceVolatile(obj, offset);
             } else {
-                val = unsafe.getObject(obj, offset);
+                val = unsafe.getReference(obj, offset);
             }
             ((TaintedReferenceWithObjTag) prealloc).val = val;
             return MultiDTaintedArray.boxOnly1D(prealloc);
             // return prealloc;
         } else {
-            prealloc = (policy == SpecialAccessPolicy.VOLATILE) ? unsafe.getObjectVolatile(obj, offset) : unsafe.getObject(obj, offset);
+            prealloc = (policy == SpecialAccessPolicy.VOLATILE) ? unsafe.getReferenceVolatile(obj, offset) : unsafe.getReference(obj, offset);
             return MultiDTaintedArray.boxOnly1D(prealloc);
         }
     }
@@ -236,13 +247,13 @@ public class RuntimeUnsafePropagator {
         if(pair != null) {
             switch(policy) {
                 case ORDERED:
-                    unsafe.putOrderedObject(obj, pair.tagFieldOffset, tag);
+                    unsafe.putReferenceRelease(obj, pair.tagFieldOffset, tag);
                     break;
                 case VOLATILE:
-                    unsafe.putObjectVolatile(obj, pair.tagFieldOffset, tag);
+                    unsafe.putReferenceVolatile(obj, pair.tagFieldOffset, tag);
                     break;
                 default:
-                    unsafe.putObject(obj, pair.tagFieldOffset, tag);
+                    unsafe.putReference(obj, pair.tagFieldOffset, tag);
             }
         }
     }
@@ -290,7 +301,7 @@ public class RuntimeUnsafePropagator {
             int val = ((TaintedIntWithObjTag) value).val;
             switch(policy) {
                 case ORDERED:
-                    unsafe.putOrderedInt(obj, offset, val);
+                    unsafe.putIntRelease(obj, offset, val);
                     break;
                 case VOLATILE:
                     unsafe.putIntVolatile(obj, offset, val);
@@ -302,7 +313,7 @@ public class RuntimeUnsafePropagator {
             long val = ((TaintedLongWithObjTag) value).val;
             switch(policy) {
                 case ORDERED:
-                    unsafe.putOrderedLong(obj, offset, val);
+                    unsafe.putLongRelease(obj, offset, val);
                     break;
                 case VOLATILE:
                     unsafe.putLongVolatile(obj, offset, val);
@@ -321,24 +332,24 @@ public class RuntimeUnsafePropagator {
             Object val = ((LazyArrayObjTags) value).getVal();
             switch(policy) {
                 case ORDERED:
-                    unsafe.putOrderedObject(obj, offset, val);
+                    unsafe.putReferenceRelease(obj, offset, val);
                     break;
                 case VOLATILE:
-                    unsafe.putObjectVolatile(obj, offset, val);
+                    unsafe.putReferenceVolatile(obj, offset, val);
                     break;
                 default:
-                    unsafe.putObject(obj, offset, val);
+                    unsafe.putReference(obj, offset, val);
             }
         } else {
             switch(policy) {
                 case ORDERED:
-                    unsafe.putOrderedObject(obj, offset, value);
+                    unsafe.putReferenceRelease(obj, offset, value);
                     break;
                 case VOLATILE:
-                    unsafe.putObjectVolatile(obj, offset, value);
+                    unsafe.putReferenceVolatile(obj, offset, value);
                     break;
                 default:
-                    unsafe.putObject(obj, offset, value);
+                    unsafe.putReference(obj, offset, value);
             }
         }
     }
@@ -411,10 +422,10 @@ public class RuntimeUnsafePropagator {
         unsafe.copyMemory(srcAddress, destAddress, length);
     }
 
-    public static TaintedBooleanWithObjTag compareAndSwapObject$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, Object expected, Taint expectedTaint, Object value, Taint valueTaint, TaintedBooleanWithObjTag ret) {
+    public static TaintedBooleanWithObjTag compareAndSetReference$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, Object expected, Taint expectedTaint, Object value, Taint valueTaint, TaintedBooleanWithObjTag ret) {
         ret.taint = Taint.emptyTaint();
         if(obj instanceof LazyReferenceArrayObjTags) {
-            ret.val = unsafe.compareAndSwapObject(((LazyReferenceArrayObjTags) obj).val, offset, expected, value);
+            ret.val = unsafe.compareAndSetReference(((LazyReferenceArrayObjTags) obj).val, offset, expected, value);
             if(ret.val) {
                 swapArrayElementTag(unsafe, (LazyArrayObjTags) obj, offset, valueTaint);
             }
@@ -428,13 +439,13 @@ public class RuntimeUnsafePropagator {
                 }
                 if(pair != null && pair.wrappedFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
                     //We are doing a CAS on a 1d primitive array field
-                    ret.val = unsafe.compareAndSwapObject(obj, offset, MultiDTaintedArray.unbox1DOrNull(expected), MultiDTaintedArray.unbox1DOrNull(value));
+                    ret.val = unsafe.compareAndSetReference(obj, offset, MultiDTaintedArray.unbox1DOrNull(expected), MultiDTaintedArray.unbox1DOrNull(value));
                     didCAS = true;
                 }
             }
             if(!didCAS) {
                 //Either this is not a wrapped array, or we are storing it to the place where it should be stored without unwrapping
-                ret.val = unsafe.compareAndSwapObject(obj, offset, expected, value);
+                ret.val = unsafe.compareAndSetReference(obj, offset, expected, value);
                 if(pair == null && obj != null) {
                     pair = getOffsetPair(unsafe, obj, offset);
                 }
@@ -442,61 +453,66 @@ public class RuntimeUnsafePropagator {
 
             if(pair != null && ret.val) {
                 if(pair.tagFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
-                    unsafe.putObjectVolatile(obj, pair.tagFieldOffset, valueTaint);
+                    unsafe.putReferenceVolatile(obj, pair.tagFieldOffset, valueTaint);
                 }
                 if(pair.wrappedFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
-                    unsafe.putObjectVolatile(obj, pair.wrappedFieldOffset, value);
+                    unsafe.putReferenceVolatile(obj, pair.wrappedFieldOffset, value);
                 }
             }
         }
         return ret;
     }
 
-    public static TaintedBooleanWithObjTag compareAndSwapInt$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, int expected, Taint expectedTaint, int value, Taint valueTaint, TaintedBooleanWithObjTag ret) {
+    public static TaintedBooleanWithObjTag compareAndSetInt$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, int expected, Taint expectedTaint, int value, Taint valueTaint, TaintedBooleanWithObjTag ret) {
         ret.taint = Taint.emptyTaint();
         if(obj instanceof LazyIntArrayObjTags) {
-            ret.val = unsafe.compareAndSwapInt(((LazyIntArrayObjTags) obj).val, offset, expected, value);
+            ret.val = unsafe.compareAndSetInt(((LazyIntArrayObjTags) obj).val, offset, expected, value);
             if(ret.val) {
                 swapArrayElementTag(unsafe, (LazyArrayObjTags) obj, offset, valueTaint);
             }
         } else {
-            ret.val = unsafe.compareAndSwapInt(obj, offset, expected, value);
-            OffsetPair pair = null;
-            if(obj != null) {
-                pair = getOffsetPair(unsafe, obj, offset);
+            ret.val = unsafe.compareAndSetInt(obj, offset, expected, value);
+            boolean success = false;
+            if(ret.val){
+                success = true;
             }
-            if(pair != null && ret.val) {
-                if(pair.tagFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
-                    unsafe.putObjectVolatile(obj, pair.tagFieldOffset, valueTaint);
-                }
-            }
+            // was finding that we might have triggered bad class loading with getOffsetPair
+            //OffsetPair pair = null;
+            //if(obj != null) {
+            //    pair = getOffsetPair(unsafe, obj, offset);
+            //}
+            //if(pair != null && ret.val) {
+            //    if(pair.tagFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
+            //        unsafe.putReferenceVolatile(obj, pair.tagFieldOffset, valueTaint);
+            //    }
+            //}
         }
         return ret;
     }
 
-    public static TaintedBooleanWithObjTag compareAndSwapLong$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, long expected, Taint expectedTaint, long value, Taint valueTaint, TaintedBooleanWithObjTag ret) {
+    public static TaintedBooleanWithObjTag compareAndSetLong$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, long expected, Taint expectedTaint, long value, Taint valueTaint, TaintedBooleanWithObjTag ret) {
         ret.taint = Taint.emptyTaint();
         if(obj instanceof LazyLongArrayObjTags) {
-            ret.val = unsafe.compareAndSwapLong(((LazyLongArrayObjTags) obj).val, offset, expected, value);
+            ret.val = unsafe.compareAndSetLong(((LazyLongArrayObjTags) obj).val, offset, expected, value);
             if(ret.val) {
                 swapArrayElementTag(unsafe, (LazyArrayObjTags) obj, offset, valueTaint);
             }
         } else {
-            ret.val = unsafe.compareAndSwapLong(obj, offset, expected, value);
+            ret.val = unsafe.compareAndSetLong(obj, offset, expected, value);
             OffsetPair pair = null;
             if(obj != null) {
                 pair = getOffsetPair(unsafe, obj, offset);
             }
             if(pair != null && ret.val) {
                 if(pair.tagFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
-                    unsafe.putObjectVolatile(obj, pair.tagFieldOffset, valueTaint);
+                    unsafe.putReferenceVolatile(obj, pair.tagFieldOffset, valueTaint);
                 }
             }
         }
         return ret;
     }
 
-    public static void putObject$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, Object val, Taint valTaint) {
+    public static void putReference$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, Object val, Taint valTaint) {
         if(obj instanceof LazyReferenceArrayObjTags) {
             ((LazyReferenceArrayObjTags) obj).set(((LazyReferenceArrayObjTags) obj).unsafeIndexFor(unsafe, offset), val, valTaint);
         } else {
@@ -506,21 +522,21 @@ public class RuntimeUnsafePropagator {
             }
             if(pair != null) {
                 if(pair.tagFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
-                    unsafe.putObject(obj, pair.tagFieldOffset, valTaint);
+                    unsafe.putReference(obj, pair.tagFieldOffset, valTaint);
                 }
                 if(pair.wrappedFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
-                    unsafe.putObject(obj, pair.wrappedFieldOffset, val);
-                    unsafe.putObject(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
+                    unsafe.putReference(obj, pair.wrappedFieldOffset, val);
+                    unsafe.putReference(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
                 } else {
-                    unsafe.putObject(obj, offset, val);
+                    unsafe.putReference(obj, offset, val);
                 }
             } else {
-                unsafe.putObject(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
+                unsafe.putReference(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
             }
         }
     }
 
-    public static void putOrderedObject$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, Object val, Taint valTaint) {
+    public static void putReferenceRelease$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, Object val, Taint valTaint) {
         if(obj instanceof LazyReferenceArrayObjTags) {
             ((LazyReferenceArrayObjTags) obj).set(((LazyReferenceArrayObjTags) obj).unsafeIndexFor(unsafe, offset), val, valTaint);
         } else {
@@ -530,46 +546,46 @@ public class RuntimeUnsafePropagator {
             }
             if(pair != null) {
                 if(pair.tagFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
-                    unsafe.putOrderedObject(obj, pair.tagFieldOffset, valTaint);
+                    unsafe.putReferenceRelease(obj, pair.tagFieldOffset, valTaint);
                 }
                 if(pair.wrappedFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
-                    unsafe.putOrderedObject(obj, pair.wrappedFieldOffset, val);
-                    unsafe.putOrderedObject(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
+                    unsafe.putReferenceRelease(obj, pair.wrappedFieldOffset, val);
+                    unsafe.putReferenceRelease(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
                 } else {
-                    unsafe.putOrderedObject(obj, offset, val);
+                    unsafe.putReferenceRelease(obj, offset, val);
                 }
             } else {
-                unsafe.putOrderedObject(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
+                unsafe.putReferenceRelease(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
             }
         }
     }
 
-    public static void putObjectVolatile$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, Object val, Taint valTaint) {
+    public static void putReferenceVolatile$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, Object val, Taint valTaint) {
         if(obj instanceof LazyReferenceArrayObjTags) {
             ((LazyReferenceArrayObjTags) obj).set(((LazyReferenceArrayObjTags) obj).unsafeIndexFor(unsafe, offset), val, valTaint);
         } else {
-            unsafe.putObjectVolatile(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
+            unsafe.putReferenceVolatile(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
             OffsetPair pair = null;
             if(obj != null) {
                 pair = getOffsetPair(unsafe, obj, offset);
             }
             if(pair != null) {
                 if(pair.tagFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
-                    unsafe.putObjectVolatile(obj, pair.tagFieldOffset, valTaint);
+                    unsafe.putReferenceVolatile(obj, pair.tagFieldOffset, valTaint);
                 }
                 if(pair.wrappedFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
-                    unsafe.putObjectVolatile(obj, pair.wrappedFieldOffset, val);
-                    unsafe.putObjectVolatile(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
+                    unsafe.putReferenceVolatile(obj, pair.wrappedFieldOffset, val);
+                    unsafe.putReferenceVolatile(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
                 } else {
-                    unsafe.putObjectVolatile(obj, offset, val);
+                    unsafe.putReferenceVolatile(obj, offset, val);
                 }
             } else {
-                unsafe.putObjectVolatile(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
+                unsafe.putReferenceVolatile(obj, offset, MultiDTaintedArray.unbox1DOrNull(val));
             }
         }
     }
 
-    public static TaintedReferenceWithObjTag getObject$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, TaintedReferenceWithObjTag ret, Object e) {
+    public static TaintedReferenceWithObjTag getReference$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, TaintedReferenceWithObjTag ret, Object e) {
         if(obj instanceof LazyReferenceArrayObjTags) {
             ((LazyReferenceArrayObjTags) obj).get(((LazyReferenceArrayObjTags) obj).unsafeIndexFor(unsafe, offset), ret);
         } else {
@@ -578,13 +594,13 @@ public class RuntimeUnsafePropagator {
             if(pair != null && pair.wrappedFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
                 offset = pair.wrappedFieldOffset;
             }
-            ret.val = unsafe.getObject(obj, offset);
+            ret.val = unsafe.getReference(obj, offset);
             getTag(unsafe, obj, offset, ret, SpecialAccessPolicy.NONE);
         }
         return ret;
     }
 
-    public static TaintedReferenceWithObjTag getObjectVolatile$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, TaintedReferenceWithObjTag ret, Object e) {
+    public static TaintedReferenceWithObjTag getReferenceVolatile$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, TaintedReferenceWithObjTag ret, Object e) {
         if(obj instanceof LazyReferenceArrayObjTags) {
             ((LazyReferenceArrayObjTags) obj).get(((LazyReferenceArrayObjTags) obj).unsafeIndexFor(unsafe, offset), ret);
         } else {
@@ -593,7 +609,7 @@ public class RuntimeUnsafePropagator {
             if(pair != null && pair.wrappedFieldOffset != Unsafe.INVALID_FIELD_OFFSET) {
                 offset = pair.wrappedFieldOffset;
             }
-            ret.val = unsafe.getObjectVolatile(obj, offset);
+            ret.val = unsafe.getReferenceVolatile(obj, offset);
             getTag(unsafe, obj, offset, ret, SpecialAccessPolicy.VOLATILE);
         }
         return ret;
@@ -783,14 +799,14 @@ public class RuntimeUnsafePropagator {
         return ret;
     }
 
-    public static void putOrderedInt$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, int val, Taint valTaint) {
+    public static void putIntRelease$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, int val, Taint valTaint) {
         if(obj instanceof LazyArrayObjTags) {
-            unsafe.putOrderedInt(((LazyArrayObjTags) obj).getVal(), offset, val);
+            unsafe.putIntRelease(((LazyArrayObjTags) obj).getVal(), offset, val);
             if((valTaint != null && !valTaint.isEmpty()) || ((LazyArrayObjTags) obj).taints != null) {
                 ((LazyArrayObjTags) obj).setTaint(((LazyArrayObjTags) obj).unsafeIndexFor(unsafe, offset), valTaint);
             }
         } else {
-            unsafe.putOrderedInt(obj, offset, val);
+            unsafe.putIntRelease(obj, offset, val);
             putTag(unsafe, obj, offset, valTaint, SpecialAccessPolicy.ORDERED);
         }
     }
@@ -946,14 +962,14 @@ public class RuntimeUnsafePropagator {
         }
     }
 
-    public static void putOrderedLong$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, long val, Taint valTaint) {
+    public static void putLongRelease$$PHOSPHORTAGGED(Unsafe unsafe, Taint unsafeTaint, Object obj, Taint objTaint, long offset, Taint offsetTaint, long val, Taint valTaint) {
         if(obj instanceof LazyArrayObjTags) {
-            unsafe.putOrderedLong(((LazyArrayObjTags) obj).getVal(), offset, val);
+            unsafe.putLongRelease(((LazyArrayObjTags) obj).getVal(), offset, val);
             if((valTaint != null && !valTaint.isEmpty()) || ((LazyArrayObjTags) obj).taints != null) {
                 ((LazyArrayObjTags) obj).setTaint(((LazyArrayObjTags) obj).unsafeIndexFor(unsafe, offset), valTaint);
             }
         } else {
-            unsafe.putOrderedLong(obj, offset, val);
+            unsafe.putLongRelease(obj, offset, val);
             putTag(unsafe, obj, offset, valTaint, SpecialAccessPolicy.ORDERED);
         }
     }
@@ -1029,4 +1045,5 @@ public class RuntimeUnsafePropagator {
             return String.format("{field @ %d -> tag @ %d, wrapper @ %d}", origFieldOffset, tagFieldOffset, wrappedFieldOffset);
         }
     }
+
 }

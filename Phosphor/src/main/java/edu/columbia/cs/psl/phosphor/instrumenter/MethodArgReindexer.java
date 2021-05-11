@@ -176,7 +176,7 @@ public class MethodArgReindexer extends MethodVisitor {
         } else if(index < originalLastArgIdx) {
             String shadow = TaintUtils.getShadowTaintType(desc);
             if(shadow != null) {
-                super.visitLocalVariable(name + TaintUtils.METHOD_SUFFIX, shadow, null, start, end, oldArgMappings[index] + 1);
+                super.visitLocalVariable(name + TaintUtils.METHOD_SUFFIX, shadow, null, start, end, oldArgMappings[index] + t.getSize());
             }
             super.visitLocalVariable(name, desc, signature, start, end, oldArgMappings[index]);
             if(index == originalLastArgIdx - 1 && (Configuration.IMPLICIT_HEADERS_NO_TRACKING || Configuration.IMPLICIT_TRACKING)) {

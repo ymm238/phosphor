@@ -373,6 +373,11 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
             isRewrittenDesc = true;
         }
 
+        // TODO
+        if(className.equals("java/lang/invoke/StringConcatFactory")) {
+            access = access & ~Opcodes.ACC_VARARGS;
+        }
+
         if(isLambda) {
             for(Type t : argTypes) {
                 newArgTypes.add(t);
@@ -472,7 +477,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
             ReflectionHidingMV reflectionMasker = new ReflectionHidingMV(next, className, name, isEnum);
             PrimitiveBoxingFixer boxFixer = new PrimitiveBoxingFixer(access, className, name, desc, signature, exceptions, reflectionMasker, analyzer);
 
-            TaintPassingMV tmv = new TaintPassingMV(boxFixer, access, className, name, newDesc, signature, exceptions, desc, analyzer, rootmV, wrapperMethodsToAdd, controlFlowPolicy);
+            TaintPassingMV tmv = new TaintPassingMV(boxFixer, access, className, name, newDesc, signature, exceptions, desc, analyzer, rootmV, wrapperMethodsToAdd, controlFlowPolicy, this.isInterface);
             tmv.setFields(fields);
 
             ReflectionHidingMV uninstReflectionMasker = new ReflectionHidingMV(mv, className, name, isEnum);
@@ -560,6 +565,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
         } else {
             // this is a native method. we want here to make a $taint method that will call the original one.
             final MethodVisitor prev = super.visitMethod(access, name, desc, signature, exceptions);
+
             MethodNode rawMethod = new MethodNode(Configuration.ASM_VERSION, access, name, desc, signature, exceptions) {
                 @Override
                 public void visitEnd() {
@@ -773,21 +779,8 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                     Type taintType = MultiDTaintedArray.getTypeForType(Type.getType(char[].class));
                     mv.visitFieldInsn(Opcodes.GETSTATIC, Type.getInternalName(Configuration.class), "autoTainter", Type.getDescriptor(TaintSourceWrapper.class));
                     mv.visitVarInsn(ALOAD, 0);
-                    mv.visitInsn(Opcodes.DUP);
-                    mv.visitFieldInsn(Opcodes.GETFIELD, className, "value", "[C");
-                    //A
-                    mv.visitTypeInsn(Opcodes.NEW, taintType.getInternalName());
-                    //A T
-                    mv.visitInsn(Opcodes.DUP_X1);
-                    //T A T
-                    mv.visitInsn(Opcodes.SWAP);
-                    mv.visitMethodInsn(Opcodes.INVOKESPECIAL, taintType.getInternalName(), "<init>", "([C)V", false);
-                    //T
-                    mv.visitInsn(Opcodes.DUP_X1);
-                    mv.visitFieldInsn(Opcodes.PUTFIELD, className, "value" + TaintUtils.TAINT_WRAPPER_FIELD, taintType.getDescriptor());
-
                     mv.visitVarInsn(ALOAD, 1);
-                    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, Type.getInternalName(TaintSourceWrapper.class), "combineTaintsOnArray", "(Ljava/lang/Object;" + Configuration.TAINT_TAG_DESC + ")V", false);
+                    mv.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(TaintSourceWrapper.class), "setStringTaintTag", "(Ljava/lang/String;" + Configuration.TAINT_TAG_DESC + ")V", false);
                 } else if((className.equals(TaintPassingMV.INTEGER_NAME) || className.equals(TaintPassingMV.LONG_NAME)
                         || className.equals(TaintPassingMV.FLOAT_NAME) || className.equals(TaintPassingMV.DOUBLE_NAME))) {
                     //For primitive types, also set the "value" field
@@ -1123,7 +1116,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                         if(m.name.equals("<init>")) {
                             ga.visitMethodInsn(Opcodes.INVOKESPECIAL, className, m.name, newDesc, false);
                         } else {
-                            ga.visitMethodInsn(opcode, className, m.name + (useSuffixName ? TaintUtils.METHOD_SUFFIX : ""), newDesc, false);
+                            ga.visitMethodInsn(opcode, className, m.name + (useSuffixName ? TaintUtils.METHOD_SUFFIX : ""), newDesc, isInterface);
                         }
                         //unbox collections
                         idx = 0;
@@ -1204,7 +1197,7 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                 } else {
                     // Generate wrapper for native method - a native wrapper
                     generateNativeWrapper(m, m.name, false);
-                    if(className.equals("sun/misc/Unsafe")) {
+                    if(Instrumenter.isUnsafeClass(className)) {
                         generateNativeWrapper(m, m.name, true);
                     }
                 }
@@ -1461,9 +1454,9 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                         if(isUntaggedCall) {
                             ga.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(MultiDTaintedArray.class), "unbox1D", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
                         } else {
-                            if(className.equals("sun/misc/Unsafe")) {
+                            if(Instrumenter.isUnsafeClass(className)) {
                                 ga.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(MultiDTaintedArrayWithObjTag.class), "unboxRawOnly1D", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
-                            } else if(className.equals("sun/reflect/NativeMethodAccessorImpl") && "invoke0".equals(methodNameToCall) && Type.getType(Object.class).equals(t)) {
+                            } else if((className.equals("sun/reflect/NativeMethodAccessorImpl") || className.equals("jdk/internal/reflect/NativeMethodAccessorImpl")) && "invoke0".equals(methodNameToCall) && Type.getType(Object.class).equals(t)) {
                                 ga.loadArg(0);
                                 ga.visitInsn(Opcodes.SWAP);
                                 ga.visitMethodInsn(Opcodes.INVOKESTATIC, Type.getInternalName(MultiDTaintedArray.class), "unboxMethodReceiverIfNecessary", "(Ljava/lang/reflect/Method;Ljava/lang/Object;)Ljava/lang/Object;", false);
@@ -1499,9 +1492,9 @@ public class TaintTrackingClassVisitor extends ClassVisitor {
                 //call with uninst sentinel
                 descToCall = descToCall.substring(0, descToCall.indexOf(')')) + Type.getDescriptor(UninstrumentedTaintSentinel.class) + ")" + descToCall.substring(descToCall.indexOf(')') + 1);
                 ga.visitInsn(Opcodes.ACONST_NULL);
-                ga.visitMethodInsn(opcode, className, m.name, descToCall, false);
+                ga.visitMethodInsn(opcode, className, m.name, descToCall, isInterface);
             } else {
-                ga.visitMethodInsn(opcode, className, methodNameToCall, descToCall, false);
+                ga.visitMethodInsn(opcode, className, methodNameToCall, descToCall, isInterface);
             }
             if(origReturn != newReturn) {
                 if(origReturn.getSort() == Type.ARRAY && origReturn.getDimensions() > 1) {

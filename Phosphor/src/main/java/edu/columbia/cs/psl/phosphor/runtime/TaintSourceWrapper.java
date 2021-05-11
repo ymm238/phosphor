@@ -247,6 +247,7 @@ public class TaintSourceWrapper<T extends AutoTaintLabel> {
     }
 
     public static void setStringTaintTag(String str, Taint tag) {
+        // TODO: Previously, I think we were combining  tags on strings, now this is overwriting. Is this the right thing to do now?
         if (str != null) {
             if (Configuration.IS_JAVA_8) {
                 LazyCharArrayObjTags chars = InstrumentedJREFieldHelper.JAVA_8getvaluePHOSPHOR_WRAPPER(str);
