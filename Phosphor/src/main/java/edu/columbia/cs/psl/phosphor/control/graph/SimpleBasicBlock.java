@@ -64,6 +64,7 @@ public class SimpleBasicBlock implements BasicBlock {
         StringBuilder builder = new StringBuilder("\"");
         AbstractInsnNode insn = firstInsn;
         do {
+            //yqx
             builder.append(InstructionTextifier.getInstance().convertInstructionToString(insn, labelNames)).append("\\n");
             if(insn == lastInsn) {
                 break;

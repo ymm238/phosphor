@@ -8,6 +8,8 @@ import edu.columbia.cs.psl.phosphor.struct.harmony.util.StringBuilder;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * A flow graph composed of a set of vertices connected by directed edges. The graph is unweighted and has single point
@@ -544,7 +546,8 @@ public final class FlowGraph<V> {
         writer.write(String.format("\tnode [shape=box]%n"));
         int i = 0;
         for(V vertex : sortedVertices) {
-            writer.write(String.format("\t%d [label=%s]%n", i, escapeDotLabel(printer.apply(vertex))));
+//            writer.write(String.format("\t%d [label=%s]%n", i, escapeDotLabel(printer.apply(vertex))));
+            writer.write(String.format("\t%d [label=%s]%n", i, reserveLineNumber(escapeDotLabel(printer.apply(vertex)))));
             vertexIndexMap.put(vertex, i++);
         }
         for(V vertex : sortedVertices) {
@@ -556,6 +559,22 @@ public final class FlowGraph<V> {
         }
         writer.write(String.format("\tlabel=%s%n", graphName));
         writer.write(String.format("\tfontsize=%d%n}%n", fontSize));
+    }
+
+    private static String reserveLineNumber(String s){
+        Pattern p = Pattern.compile("LINENUMBER\\s(\\d+?)\\sL");
+        Matcher matcher = p.matcher(s);
+        if (matcher.find()){
+            StringBuilder builder = new StringBuilder();
+            builder.append('"').append(matcher.group(1));
+            while (matcher.find()){
+                builder.append(" ").append(matcher.group(1));
+            }
+            builder.append('"');
+            return builder.toString();
+        }else {
+            return s;
+        }
     }
 
     private static String escapeDotLabel(String label) {
