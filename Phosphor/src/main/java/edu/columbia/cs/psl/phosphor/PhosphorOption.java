@@ -9,6 +9,7 @@ import edu.columbia.cs.psl.phosphor.struct.harmony.util.StringBuilder;
 import org.apache.commons.cli.*;
 import org.objectweb.asm.ClassVisitor;
 
+import javax.naming.CompositeName;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 
@@ -18,9 +19,9 @@ public enum PhosphorOption {
             .group(PhosphorOptionGroup.CONTROL_PROPAGATION)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(forRuntimeInst && isPresent) {
+            if (forRuntimeInst && isPresent) {
                 Configuration.IMPLICIT_TRACKING = true;
-            } else if(!forRuntimeInst) {
+            } else if (!forRuntimeInst) {
                 Configuration.IMPLICIT_TRACKING = isPresent;
             }
         }
@@ -39,9 +40,9 @@ public enum PhosphorOption {
             .alternativeName("implicitExceptions")) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(forRuntimeInst && isPresent) {
+            if (forRuntimeInst && isPresent) {
                 Configuration.IMPLICIT_EXCEPTION_FLOW = true;
-            } else if(!forRuntimeInst) {
+            } else if (!forRuntimeInst) {
                 Configuration.IMPLICIT_EXCEPTION_FLOW = isPresent;
             }
         }
@@ -85,7 +86,7 @@ public enum PhosphorOption {
     SERIALIZATION(new PhosphorOptionBuilder("Read and write taint tags through Java Serialization", true, true)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(forRuntimeInst && isPresent) {
+            if (forRuntimeInst && isPresent) {
                 Configuration.TAINT_THROUGH_SERIALIZATION = true;
             }
         }
@@ -130,12 +131,12 @@ public enum PhosphorOption {
             "chain before taint tracking is added to the class.", true, true).argType(Class.class)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(isPresent) {
+            if (isPresent) {
                 try {
                     @SuppressWarnings("unchecked")
                     Class<? extends ClassVisitor> clazz = (Class<? extends ClassVisitor>) commandLine.getParsedOptionValue(optionName);
                     Configuration.PRIOR_CLASS_VISITOR = clazz;
-                } catch(ParseException e) {
+                } catch (ParseException e) {
                     System.err.println("Failed to create specified prior class visitor: " + optionName);
                 }
             } else {
@@ -151,16 +152,16 @@ public enum PhosphorOption {
             .group(PhosphorOptionGroup.CONTROL_PROPAGATION)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(isPresent) {
+            if (isPresent) {
                 try {
                     @SuppressWarnings("unchecked")
                     Class<? extends ControlFlowManager> clazz = (Class<? extends ControlFlowManager>) commandLine.getParsedOptionValue(optionName);
-                    if(clazz != null) {
+                    if (clazz != null) {
                         Configuration.controlFlowManagerPackage = clazz.getPackage().getName().replace('.', '/');
                         Configuration.controlFlowManager = clazz.newInstance();
                         Configuration.IMPLICIT_TRACKING = true;
                     }
-                } catch(Exception e) {
+                } catch (Exception e) {
                     System.err.println("Failed to create control propagation manager: " + commandLine.getOptionValue(optionName));
                 }
             } else {
@@ -179,7 +180,7 @@ public enum PhosphorOption {
     WITH_HEAVY_OBJ_EQUALS_HASHCODE(new PhosphorOptionBuilder(null, true, true).alternativeName("objmethods")) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(isPresent) {
+            if (isPresent) {
                 Configuration.WITH_HEAVY_OBJ_EQUALS_HASHCODE = true;
             }
         }
@@ -187,11 +188,11 @@ public enum PhosphorOption {
     TAINT_SOURCES(new PhosphorOptionBuilder(null, false, true).argType(String.class)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(isPresent) {
+            if (isPresent) {
                 String value = commandLine.getOptionValue(optionName);
                 try {
                     Instrumenter.sourcesFile = new FileInputStream(value);
-                } catch(FileNotFoundException e) {
+                } catch (FileNotFoundException e) {
                     e.printStackTrace();
                 }
             }
@@ -200,11 +201,11 @@ public enum PhosphorOption {
     TAINT_SINKS(new PhosphorOptionBuilder(null, false, true).argType(String.class)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(isPresent) {
+            if (isPresent) {
                 String value = commandLine.getOptionValue(optionName);
                 try {
                     Instrumenter.sinksFile = new FileInputStream(value);
-                } catch(FileNotFoundException e) {
+                } catch (FileNotFoundException e) {
                     e.printStackTrace();
                 }
             }
@@ -213,11 +214,11 @@ public enum PhosphorOption {
     TAINT_THROUGH(new PhosphorOptionBuilder(null, false, true).argType(String.class)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(isPresent) {
+            if (isPresent) {
                 String value = commandLine.getOptionValue(optionName);
                 try {
                     Instrumenter.taintThroughFile = new FileInputStream(value);
-                } catch(FileNotFoundException e) {
+                } catch (FileNotFoundException e) {
                     e.printStackTrace();
                 }
             }
@@ -226,14 +227,14 @@ public enum PhosphorOption {
     TAINT_SOURCE_WRAPPER(new PhosphorOptionBuilder(null, false, true).argType(Class.class)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(isPresent) {
+            if (isPresent) {
                 try {
                     @SuppressWarnings("unchecked")
                     Class<? extends TaintSourceWrapper<?>> clazz = (Class<? extends TaintSourceWrapper<?>>) commandLine.getParsedOptionValue(optionName);
-                    if(clazz != null) {
+                    if (clazz != null) {
                         Configuration.autoTainter = clazz.newInstance();
                     }
-                } catch(Exception e) {
+                } catch (Exception e) {
                     System.err.println("Failed to create taint source wrapper: " + commandLine.getOptionValue(optionName));
                 }
             }
@@ -242,16 +243,16 @@ public enum PhosphorOption {
     TAINT_TAG_FACTORY(new PhosphorOptionBuilder(null, false, true).argType(Class.class)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(isPresent) {
+            if (isPresent) {
                 try {
                     @SuppressWarnings("unchecked")
                     Class<? extends TaintTagFactory> clazz = (Class<? extends TaintTagFactory>) commandLine.getParsedOptionValue(optionName);
-                    if(clazz != null) {
+                    if (clazz != null) {
                         Configuration.taintTagFactoryPackage = clazz.getPackage().getName().replace('.', '/');
 
                         Configuration.taintTagFactory = clazz.newInstance();
                     }
-                } catch(Exception e) {
+                } catch (Exception e) {
                     System.err.println("Failed to create taint tag factory: " + commandLine.getOptionValue(optionName));
                 }
             }
@@ -260,7 +261,7 @@ public enum PhosphorOption {
     IGNORE(new PhosphorOptionBuilder(null, false, true).argType(String.class)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(isPresent) {
+            if (isPresent) {
                 Configuration.ADDL_IGNORE = commandLine.getOptionValue(optionName);
             }
         }
@@ -268,8 +269,22 @@ public enum PhosphorOption {
     IGNORED_METHOD(new PhosphorOptionBuilder(null, false, true).argType(String.class)) {
         @Override
         public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
-            if(isPresent) {
+            if (isPresent) {
                 Configuration.ignoredMethods.add(commandLine.getOptionValue(optionName));
+            }
+        }
+    },
+    MAKE_CFG(new PhosphorOptionBuilder("构造CFG图", true, false)) {
+        @Override
+        public void configure(boolean forRuntimeInst, boolean isPresent, CommandLine commandLine) {
+            if (isPresent) {
+                Configuration.makeCfg = true;
+//                String makeCfgArgs = commandLine.getOptionValue(optionName);
+//                System.out.println("makeCfgArgs = " + makeCfgArgs);
+//                String[] cfgArgs = makeCfgArgs.split(",");
+//                Configuration.classPathToMakeCfg = cfgArgs[0];
+//                Configuration.destDirToMakeCfg = cfgArgs[1];
+//                Configuration.includeExceptionalEdges = cfgArgs[2].equals("true") ? true : false;
             }
         }
     };
@@ -282,17 +297,17 @@ public enum PhosphorOption {
 
     PhosphorOption(PhosphorOptionBuilder phosphorBuilder) {
         String name = createName(this);
-        if(phosphorBuilder.alternativeName != null) {
+        if (phosphorBuilder.alternativeName != null) {
             builder = Option.builder(phosphorBuilder.alternativeName).longOpt(name);
             optionName = phosphorBuilder.alternativeName;
         } else {
             builder = Option.builder(name);
             optionName = name;
         }
-        if(phosphorBuilder.desc != null) {
+        if (phosphorBuilder.desc != null) {
             builder.desc(phosphorBuilder.desc);
         }
-        if(phosphorBuilder.argType != null) {
+        if (phosphorBuilder.argType != null) {
             builder.type(phosphorBuilder.argType).hasArg();
         }
         group = phosphorBuilder.group;
@@ -310,10 +325,10 @@ public enum PhosphorOption {
         StringBuilder builder = new StringBuilder();
         char[] charArray = option.toString().toCharArray();
         boolean capitalizeNext = false;
-        for(char c : charArray) {
-            if(c == '_') {
+        for (char c : charArray) {
+            if (c == '_') {
                 capitalizeNext = true;
-            } else if(capitalizeNext) {
+            } else if (capitalizeNext) {
                 builder.append(c);
                 capitalizeNext = false;
             } else {
@@ -326,24 +341,24 @@ public enum PhosphorOption {
 
     public static Options createOptions(boolean forRuntimeInst) {
         Options options = new Options();
-        if(!forRuntimeInst) {
+        if (!forRuntimeInst) {
             options.addOption(new Option("help", "Prints this message"));
         }
         EnumMap<PhosphorOptionGroup, OptionGroup> groupMap = new EnumMap<>(PhosphorOptionGroup.class);
-        for(PhosphorOption phosphorOption : values()) {
+        for (PhosphorOption phosphorOption : values()) {
             boolean enabled = forRuntimeInst ? phosphorOption.dynamicOption : phosphorOption.staticOption;
-            if(enabled) {
-                if(phosphorOption.group == PhosphorOptionGroup.GENERAL) {
+            if (enabled) {
+                if (phosphorOption.group == PhosphorOptionGroup.GENERAL) {
                     options.addOption(phosphorOption.createOption());
                 } else {
-                    if(!groupMap.containsKey(phosphorOption.group)) {
+                    if (!groupMap.containsKey(phosphorOption.group)) {
                         groupMap.put(phosphorOption.group, new OptionGroup());
                     }
                     groupMap.get(phosphorOption.group).addOption(phosphorOption.createOption());
                 }
             }
         }
-        for(OptionGroup group : groupMap.values()) {
+        for (OptionGroup group : groupMap.values()) {
             options.addOptionGroup(group);
         }
         return options;
@@ -355,25 +370,25 @@ public enum PhosphorOption {
         CommandLine line;
         try {
             line = parser.parse(options, args);
-        } catch(org.apache.commons.cli.ParseException exp) {
-            if(forRuntimeInst) {
+        } catch (org.apache.commons.cli.ParseException exp) {
+            if (forRuntimeInst) {
                 System.err.println(exp.getMessage());
                 return null;
             }
             HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("java -jar phosphor.jar [OPTIONS] [input] [output]", options);
             System.err.println(exp.getMessage());
-            if(exp.getMessage().contains("-multiTaint")) {
+            if (exp.getMessage().contains("-multiTaint")) {
                 System.err.println("Note: the -multiTaint option has been removed, and is now enabled by default (int tags no longer exist)");
             }
             return null;
         }
-        if(!forRuntimeInst && (line.hasOption("help") || line.getArgs().length != 2)) {
+        if (!forRuntimeInst && (line.hasOption("help") || line.getArgs().length != 2)) {
             HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("java -jar phosphor.jar [OPTIONS] [input] [output]", options);
             return null;
         }
-        for(PhosphorOption phosphorOption : values()) {
+        for (PhosphorOption phosphorOption : values()) {
             phosphorOption.configure(forRuntimeInst, line.hasOption(phosphorOption.optionName), line);
         }
         return line;

@@ -1,5 +1,6 @@
 package edu.columbia.cs.psl.phosphor.control.graph;
 
+import edu.columbia.cs.psl.phosphor.Configuration;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.Comparator;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.Map;
 import org.objectweb.asm.ClassReader;
@@ -9,9 +10,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.PrintWriter;
+import java.io.*;
 
 import static edu.columbia.cs.psl.phosphor.control.graph.BasicBlock.getNumericLabelNames;
 
@@ -109,6 +108,46 @@ public class BaseControlFlowGraphCreator extends ControlFlowGraphCreator<BasicBl
         FlowGraph<BasicBlock> graph = builder.build();
         builder = new FlowGraphBuilder<>();
         return graph;
+    }
+
+    public static void makeCfg(String[] args) throws IOException {
+        File classFile;
+        File outputDirectory;
+        boolean includeExceptionalEdges = true;
+        try {
+            classFile = new File(args[0]);
+            outputDirectory = new File(args[1]);
+            if(!classFile.isFile() || !(outputDirectory.isDirectory() || outputDirectory.mkdirs())) {
+                throw new IllegalArgumentException();
+            }
+        } catch(Exception e) {
+            throw new IllegalArgumentException("Usage: class-file output-directory include-exceptional-edges", e);
+        }
+        ClassNode classNode = new ClassNode();
+        new ClassReader(new FileInputStream(classFile)).accept(classNode, ClassReader.EXPAND_FRAMES);
+        int methodNum = 0;
+        Comparator<BasicBlock> comparator = (b1, b2) -> {
+            if(b1 instanceof EntryPoint || b2 instanceof ExitPoint) {
+                return -1;
+            } else if(b1 instanceof ExitPoint || b2 instanceof EntryPoint) {
+                return 1;
+            } else if(b1 instanceof SimpleBasicBlock && b2 instanceof SimpleBasicBlock) {
+                return Integer.compare(((SimpleBasicBlock) b1).getIdentifier(), ((SimpleBasicBlock) b2).getIdentifier());
+            } else {
+                return 0;
+            }
+        };
+        String[] classNameParts = classNode.name.split("/");
+        String className = classNameParts[classNameParts.length - 1];
+        for(MethodNode mn : classNode.methods) {
+            FlowGraph<BasicBlock> cfg = new BaseControlFlowGraphCreator(includeExceptionalEdges)
+                    .createControlFlowGraph(mn);
+            Map<Label, String> labelNames = getNumericLabelNames(mn.instructions);
+            try(PrintWriter writer = new PrintWriter(new File(outputDirectory, String.format("%s%d.gv", mn.name, methodNum)))) {
+                cfg.write(writer, String.format("\"%s.%s%s\"", className, mn.name, mn.desc), comparator, (b) -> b.toDotString(labelNames), 20);
+                methodNum++;
+            }
+        }
     }
 
     public static void main(String[] args) throws Exception {

@@ -26,6 +26,9 @@ public class PowerSetTree {
     private IntObjectAMT<SinglyLinkedList<RankReference>> rankMap;
     // The next new rank that should be assigned to an object
     private int nextRank;
+    // 路径
+    public static String path;
+
 
     /* Constructs a new empty pool. Initializes the root node that represents the empty set. */
     private PowerSetTree() {
@@ -36,9 +39,9 @@ public class PowerSetTree {
     }
 
     /* Resets the tree to its initial state, turning all reachable SetNodes into quasi-empty sets.
-    * THREAD SAFETY WARNING: Other threads running concurrently might check to see if taints are empty while this method
-    * runs. If so, there is no guarantee that they will see taints emptied until after this method returns.
-    * */
+     * THREAD SAFETY WARNING: Other threads running concurrently might check to see if taints are empty while this method
+     * runs. If so, there is no guarantee that they will see taints emptied until after this method returns.
+     * */
     public synchronized void reset() {
         this.rankMap.clear();
         this.rankQueue.clear();
@@ -46,9 +49,9 @@ public class PowerSetTree {
         // Make all reachable nodes quasi-empty sets
         SinglyLinkedList<SetNode> nodeStack = new SinglyLinkedList<>();
         nodeStack.push(root);
-        while(!nodeStack.isEmpty()) {
+        while (!nodeStack.isEmpty()) {
             SetNode node = nodeStack.pop();
-            for(SetNode child : node.getChildren()) {
+            for (SetNode child : node.getChildren()) {
                 nodeStack.push(child);
             }
             node.empty();
@@ -57,7 +60,7 @@ public class PowerSetTree {
 
     /* If a rank can be reused from the rankQueue, returns that rank. Otherwise returns and increments nextRank. */
     private int getAvailableRank() {
-        if(!rankQueue.isEmpty()) {
+        if (!rankQueue.isEmpty()) {
             // Try to reuse a rank
             return rankQueue.pop();
         } else {
@@ -71,7 +74,7 @@ public class PowerSetTree {
      * object and the rank assigned to objects equal to the specified object. */
     private synchronized RankedObject getRankedObject(Object object) {
         int hash = object.hashCode();
-        if(!rankMap.contains(hash)) {
+        if (!rankMap.contains(hash)) {
             SinglyLinkedList<RankReference> list = new SinglyLinkedList<>();
             rankMap.put(hash, list);
             RankedObject ret = new RankedObject(object, getAvailableRank());
@@ -80,15 +83,15 @@ public class PowerSetTree {
         } else {
             SinglyLinkedList<RankReference> list = rankMap.get(hash);
             Iterator<RankReference> it = list.iterator();
-            while(it.hasNext()) {
+            while (it.hasNext()) {
                 RankReference ref = it.next();
                 RankedObject ro = ref.get();
-                if(ro == null) {
+                if (ro == null) {
                     // Remove reference with garbage collected referent from list
                     it.remove();
                     // Push the rank of the garbage collected object onto the stack so that it can be reused
                     rankQueue.push(ref.rank);
-                } else if(object.equals(ro.object)) {
+                } else if (object.equals(ro.object)) {
                     // Existing rank for the specified object was found
                     return ro;
                 }
@@ -107,7 +110,7 @@ public class PowerSetTree {
 
     /* Returns a node representing the set containing only the specified element. */
     public SetNode makeSingletonSet(Object element) {
-        if(element == null) {
+        if (element == null) {
             // Null elements cannot be added to sets; return the node representing the empty set
             return emptySet();
         }
@@ -117,6 +120,30 @@ public class PowerSetTree {
     /* Returns the singleton instance of PowerSetTree. */
     public static PowerSetTree getInstance() {
         return PowerSetTreeSingleton.INSTANCE;
+    }
+
+
+    private void printChildren(SetNode parent, SinglyLinkedList<SetNode> children) {
+//        String rootLabel = parent.toString();
+//        String childLabel;
+        if (children != null) {
+            for (SetNode child : children) {
+                path += String.format("%s->%s ", parent, child);
+            }
+            for (SetNode child : children) {
+                printChildren(child, child.getChildren());
+            }
+        }
+    }
+//
+//    public String printPowerSetTree(){
+//        throw new IllegalStateException("不可直接调用");
+//    }
+
+    public String printPowerSetTree() {
+        path = "";
+        printChildren(root, root.getChildren());
+        return path;
     }
 
     /* Represents some set in the collection. The set represented by some node contains the objects associated with
@@ -341,15 +368,17 @@ public class PowerSetTree {
             in.defaultReadObject();
             SinglyLinkedList<Object> labels = (SinglyLinkedList<Object>) in.readObject();
             SetNode ret = (SetNode) Taint.emptyTaint();
-            for(Object o : labels){
+            for (Object o : labels) {
                 ret = ret.union(Taint.withLabel(o));
             }
             this.parent = ret;
         }
 
-        private Object readResolve(){
+        private Object readResolve() {
             return this.parent;
         }
+
+
     }
 
     /* Record type that associates an object with a unique integer. Used to maintain a consistent rank value for a

@@ -69,6 +69,13 @@ public class Configuration {
     public static TransformationCache CACHE = null;
     public static boolean TAINT_THROUGH_SERIALIZATION = true;
 
+    //yqx
+    public static boolean makeCfg = false;
+/*    public static String classPathToMakeCfg = null;
+    public static Boolean includeExceptionalEdges = false;
+    public static String destDirToMakeCfg = null;*/
+
+
     private Configuration() {
         // Prevents this class from being instantiated
     }
@@ -89,15 +96,15 @@ public class Configuration {
                     if (props.containsKey("extraCV")) {
                         extensionClassVisitor = (Class<? extends ClassVisitor>) Class.forName(props.getProperty("extraCV"));
                     }
-                    if(props.containsKey("taintTagFactory")) {
+                    if (props.containsKey("taintTagFactory")) {
                         taintTagFactory = (TaintTagFactory) Class.forName(props.getProperty("taintTagFactory")).newInstance();
                     }
-                    if(props.containsKey("derivedTaintListener")) {
+                    if (props.containsKey("derivedTaintListener")) {
                         derivedTaintListener = (DerivedTaintListener) Class.forName(props.getProperty("derivedTaintListener")).newInstance();
                     }
-                } catch(IOException ex) {
+                } catch (IOException ex) {
                     //fail silently
-                } catch(ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
                     e.printStackTrace();
                 }
             }
@@ -124,24 +131,24 @@ public class Configuration {
 
         @Override
         public boolean equals(Object obj) {
-            if(this == obj) {
+            if (this == obj) {
                 return true;
             }
-            if(obj == null) {
+            if (obj == null) {
                 return false;
             }
-            if(getClass() != obj.getClass()) {
+            if (getClass() != obj.getClass()) {
                 return false;
             }
             Method other = (Method) obj;
-            if(name == null) {
-                if(other.name != null) {
+            if (name == null) {
+                if (other.name != null) {
                     return false;
                 }
-            } else if(!name.equals(other.name)) {
+            } else if (!name.equals(other.name)) {
                 return false;
             }
-            if(owner == null) {
+            if (owner == null) {
                 return other.owner == null;
             } else {
                 return owner.equals(other.owner);

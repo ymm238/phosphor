@@ -1,5 +1,6 @@
 package edu.columbia.cs.psl.phosphor;
 
+import edu.columbia.cs.psl.phosphor.control.graph.BaseControlFlowGraphCreator;
 import edu.columbia.cs.psl.phosphor.instrumenter.TaintTrackingClassVisitor;
 import edu.columbia.cs.psl.phosphor.runtime.StringUtils;
 import edu.columbia.cs.psl.phosphor.struct.harmony.util.*;
@@ -184,10 +185,16 @@ public class Instrumenter {
         }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         long START = System.currentTimeMillis();
+        System.out.println("inst args = " + Arrays.toString(args));
         CommandLine line = PhosphorOption.configure(false, args);
         if(line == null) {
+            return;
+        }
+        if(Configuration.makeCfg){
+            System.out.println("开始生成gv文件");
+            BaseControlFlowGraphCreator.makeCfg(line.getArgs());
             return;
         }
         Configuration.init();
